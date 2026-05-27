@@ -25,7 +25,8 @@ router.post('/ensure', verifyToken, async (req, res) => {
   if (!email) return res.status(400).json('Email is required');
 
   let user = await User.findOne({ firebaseUid: uid });
-  const isFounder = isOwner(email);
+  // Use token email (req.email) as the authoritative check — body email is a fallback
+  const isFounder = isOwner(req.email) || isOwner(email);
 
   if (!user) {
     user = await User.create({
@@ -54,8 +55,8 @@ router.get('/:uid', verifyToken, async (req, res) => {
   const user = await User.findOne({ firebaseUid: req.params.uid });
   if (!user) return res.status(404).json('User not found');
 
-  // Owner always has Pro — force it in the response and persist async
-  if (isOwner(user.email)) {
+  // Owner always has Pro — check Firebase token email (most reliable) then DB email
+  if (isOwner(req.email) || isOwner(user.email)) {
     if (user.plan !== 'pro') {
       user.plan = 'pro';
       user.save().catch(e => console.error('[owner upgrade]', e.message));

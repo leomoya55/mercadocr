@@ -38,19 +38,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const res = await authFetch(`/api/users/${user.uid}`);
-            const { user: profile } = await res.json();
+            const data = await res.json();
+            const profile = data.user || {};
 
-            profileForm['nombre'].value    = profile.nombre    || '';
-            profileForm['apellido'].value  = profile.apellido  || '';
+            // Fallback: if DB has no name, parse Firebase displayName
+            let nombre   = profile.nombre   || '';
+            let apellido = profile.apellido || '';
+            if (!nombre && user.displayName) {
+                const parts = user.displayName.trim().split(' ');
+                nombre   = parts[0] || '';
+                apellido = parts.slice(1).join(' ') || '';
+            }
+
+            profileForm['nombre'].value    = nombre;
+            profileForm['apellido'].value  = apellido;
             profileForm['phone'].value     = profile.phone     || '';
             profileForm['provincia'].value = profile.provincia || '';
 
-            // Lock name fields if already set
-            if (profile.nombre && profile.apellido) {
-                lockNameFields();
-            }
+            if (nombre && apellido) lockNameFields();
         } catch (err) {
             console.error(err);
+            // Fallback to Firebase displayName even if API fails
+            if (user.displayName) {
+                const parts = user.displayName.trim().split(' ');
+                profileForm['nombre'].value   = parts[0] || '';
+                profileForm['apellido'].value = parts.slice(1).join(' ') || '';
+                if (profileForm['nombre'].value && profileForm['apellido'].value) lockNameFields();
+            }
         }
     });
 

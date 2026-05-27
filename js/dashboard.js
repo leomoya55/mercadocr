@@ -22,9 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const profileData = await profileResponse.json();
-    console.log('[dashboard] profile response:', profileData);
-    const profile = profileData.user;
-    if (!profile) throw new Error('Profile missing: ' + JSON.stringify(profileData));
+    const profile = profileData.user || {};
+    // Owner override: Firebase user.email is the authoritative source
+    if (user.email === 'leomoyawr300@gmail.com') profile.plan = 'pro';
     const listingCount = profileData.listingCount || 0;
 
     if (metricCount) metricCount.textContent = listingCount;
