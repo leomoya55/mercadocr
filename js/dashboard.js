@@ -10,19 +10,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const BASIC_LIMIT = 20;
 
   const loadDashboard = async (user) => {
-    let profileResponse = await authFetch(`/api/users/${user.uid}`);
-
-    // First-ever login: profile may not exist yet — create it then retry
-    if (profileResponse.status === 404) {
-      await authFetch('/api/users/ensure', {
-        method: 'POST',
-        body: JSON.stringify({ email: user.email }),
-      });
-      profileResponse = await authFetch(`/api/users/${user.uid}`);
+    // Retry up to 3 times to handle Vercel cold-start DB delays
+    let profileData = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        let profileResponse = await authFetch(`/api/users/${user.uid}`);
+        // First-ever login: profile may not exist yet — create it then retry
+        if (profileResponse.status === 404) {
+          await authFetch('/api/users/ensure', {
+            method: 'POST',
+            body: JSON.stringify({ email: user.email }),
+          });
+          profileResponse = await authFetch(`/api/users/${user.uid}`);
+        }
+        const data = await profileResponse.json();
+        if (data.user) { profileData = data; break; }
+        throw new Error('No user in response');
+      } catch (err) {
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+        else throw err;
+      }
     }
 
-    const profileData = await profileResponse.json();
-    const profile = profileData.user || {};
+    const profile = profileData.user;
     if (user.email === OWNER_EMAIL) profile.plan = 'pro';
     const listingCount = profileData.listingCount || 0;
 

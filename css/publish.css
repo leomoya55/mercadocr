@@ -88,3 +88,36 @@
     background-color: #555;
     cursor: not-allowed;
 }
+
+#publish-plan-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+#publish-plan-badge {
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.25rem 0.7rem;
+    border-radius: 20px;
+    background: rgba(232, 201, 122, 0.1);
+    border: 1px solid rgba(232, 201, 122, 0.3);
+    color: #e8c97a;
+}
+
+#publish-plan-badge.badge-pro {
+    background: rgba(100, 200, 130, 0.1);
+    border-color: rgba(100, 200, 130, 0.4);
+    color: #64c882;
+}
+
+#publish-upgrade-hint {
+    font-size: 0.85rem;
+    color: #e8c97a;
+    text-decoration: none;
+    opacity: 0.85;
+}
+
+#publish-upgrade-hint:hover { text-decoration: underline; opacity: 1; }

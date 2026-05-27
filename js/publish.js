@@ -57,6 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const showForm = () => { form?.classList.remove('hidden'); paymentsBox?.classList.add('hidden'); };
   const showPayments = () => { form?.classList.add('hidden'); paymentsBox?.classList.remove('hidden'); };
 
+  function setPlanBar(plan) {
+    const badge = document.getElementById('publish-plan-badge');
+    const hint  = document.getElementById('publish-upgrade-hint');
+    if (!badge) return;
+    const labels = { pro: 'Plan Pro', basic: 'Plan Basic', free: 'Plan Gratis' };
+    badge.textContent = labels[plan] || 'Plan Gratis';
+    badge.className   = plan === 'pro' ? 'badge-pro' : '';
+    if (hint) hint.classList.toggle('hidden', plan === 'pro');
+  }
+
   function setSubtitle(plan, listingCount, credits = 0) {
     if (!subtitle) return;
     if (plan === 'pro') {
@@ -81,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyPlanUI(plan, listingCount, credits) {
     setSubtitle(plan, listingCount, credits);
+    setPlanBar(plan);
     if (plan === 'pro') {
       showForm();
     } else if (plan === 'basic') {
