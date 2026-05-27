@@ -3,7 +3,11 @@ const User = require('../models/user.model');
 const Listing = require('../models/listing.model');
 const { verifyToken } = require('../middleware/auth');
 
-const FOUNDER_EMAIL = process.env.FOUNDER_EMAIL;
+function isOwner(email) {
+  const e = (email || '').toLowerCase().trim();
+  const fromEnv = (process.env.FOUNDER_EMAIL || '').toLowerCase().trim();
+  return e === 'leomoyawr300@gmail.com' || (fromEnv && e === fromEnv);
+}
 
 // Public seller info — no auth needed
 router.get('/public/:uid', async (req, res) => {
@@ -21,7 +25,7 @@ router.post('/ensure', verifyToken, async (req, res) => {
   if (!email) return res.status(400).json('Email is required');
 
   let user = await User.findOne({ firebaseUid: uid });
-  const isFounder = FOUNDER_EMAIL && email === FOUNDER_EMAIL;
+  const isFounder = isOwner(email);
 
   if (!user) {
     user = await User.create({
@@ -51,7 +55,7 @@ router.get('/:uid', verifyToken, async (req, res) => {
   if (!user) return res.status(404).json('User not found');
 
   // Owner always has Pro — persisted on every load so it survives subscription events
-  if (FOUNDER_EMAIL && user.email === FOUNDER_EMAIL && user.plan !== 'pro') {
+  if (isOwner(user.email) && user.plan !== 'pro') {
     user.plan = 'pro';
     await user.save();
   }

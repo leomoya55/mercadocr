@@ -33,15 +33,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const credits = profile.singlePostCredits || 0;
 
     if (metricFree) {
+      let freeText;
       if (profile.plan === 'pro') {
-        metricFree.textContent = 'Ilimitadas';
+        freeText = 'Ilimitadas';
       } else if (profile.plan === 'basic') {
-        metricFree.textContent = Math.max(0, BASIC_LIMIT - listingCount);
+        freeText = String(Math.max(0, BASIC_LIMIT - listingCount));
       } else {
         const remaining = Math.max(0, FREE_LIMIT - listingCount);
-        metricFree.textContent = remaining > 0 ? remaining
-          : credits > 0 ? `${credits} crédito${credits !== 1 ? 's' : ''}` : 0;
+        if (remaining > 0) {
+          freeText = String(remaining);
+        } else if (credits > 0) {
+          freeText = `${credits} crédito${credits !== 1 ? 's' : ''}`;
+        } else {
+          freeText = '0';
+        }
       }
+      metricFree.textContent = freeText;
     }
 
     // Credits card — only for free-plan users

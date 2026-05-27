@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const showForm = () => { form?.classList.remove('hidden'); paymentsBox?.classList.add('hidden'); };
   const showPayments = () => { form?.classList.add('hidden'); paymentsBox?.classList.remove('hidden'); };
 
+  // Show form optimistically — swapped to payments only if plan check requires it
+  showForm();
+
   function applyPlanUI(plan, listingCount, credits) {
     if (plan === 'pro') {
       setStatus('Plan Pro · Publica sin límites.');
@@ -117,8 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
     if (cached && (Date.now() - cached.ts) < 120000) {
       applyPlanUI(cached.plan, cached.listingCount, cached.credits);
-    } else {
-      setStatus('Verificando tu plan...');
     }
 
     try {
