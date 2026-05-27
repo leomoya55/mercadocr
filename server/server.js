@@ -62,16 +62,41 @@ app.use((req, res, next) => {
 // Serve static frontend from project root
 app.use(express.static(path.join(__dirname, '../'), { extensions: ['html'] }));
 
-// Serverless-safe MongoDB connection: reuse across warm invocations,
-// re-establish on cold starts, and block API requests until ready.
+// Serverless-safe MongoDB connection
 const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) return; // already connected
+  const state = mongoose.connection.readyState;
+  if (state === 1) return; // already connected
+  if (state === 2) {
+    // Already connecting — wait instead of calling connect() again
+    await new Promise((resolve, reject) => {
+      mongoose.connection.once('connected', resolve);
+      mongoose.connection.once('error', reject);
+    });
+    return;
+  }
   await mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
+    serverSelectionTimeoutMS: 8000,
+    socketTimeoutMS: 30000,
   });
   console.log('MongoDB connected');
 };
+
+// Health check — always responds even if DB is down (no auth, no DB required)
+app.get('/api/health', (req, res) => {
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  res.json({
+    server: 'ok',
+    db: states[mongoose.connection.readyState] || 'unknown',
+    env: {
+      MONGO_URI:            !!process.env.MONGO_URI,
+      STRIPE_SECRET_KEY:    !!process.env.STRIPE_SECRET_KEY,
+      FIREBASE_PROJECT_ID:  !!process.env.FIREBASE_PROJECT_ID,
+      FIREBASE_CLIENT_EMAIL:!!process.env.FIREBASE_CLIENT_EMAIL,
+      FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
+      CLOUDINARY_CLOUD_NAME:!!process.env.CLOUDINARY_CLOUD_NAME,
+    },
+  });
+});
 
 // Best-effort connect at startup
 connectDB().catch(err => console.error('Initial DB connect error:', err.message));
@@ -83,7 +108,7 @@ app.use('/api/', async (req, res, next) => {
     next();
   } catch (err) {
     console.error('DB connect error:', err.message);
-    res.status(503).json({ error: 'Base de datos no disponible. Intenta de nuevo en unos segundos.' });
+    res.status(503).json({ error: 'DB_UNAVAILABLE' });
   }
 });
 

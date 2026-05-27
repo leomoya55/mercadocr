@@ -168,9 +168,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
       applyPlanUI(profile.plan, listingCount, credits);
     } else {
-      // All retries failed — owner still gets Pro, others keep form visible
-      if (user.email === OWNER_EMAIL) applyPlanUI('pro', 0, 0);
-      console.error('Plan check failed after 3 attempts — server may be starting up');
+      // All retries failed — apply defaults so badge always shows
+      console.warn('Plan check failed after 3 attempts — showing defaults');
+      applyPlanUI(user.email === OWNER_EMAIL ? 'pro' : 'free', 0, 0);
     }
   });
 

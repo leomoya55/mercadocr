@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const BASIC_LIMIT = 20;
 
   const loadDashboard = async (user) => {
-    // Retry up to 3 times to handle Vercel cold-start DB delays
+    // Retry up to 3 times — never throw, fall back to sensible defaults
     let profileData = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -27,9 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.user) { profileData = data; break; }
         throw new Error('No user in response');
       } catch (err) {
+        console.warn(`Dashboard profile attempt ${attempt} failed:`, err.message);
         if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
-        else throw err;
       }
+    }
+
+    // DB unreachable — show UI defaults so the page is still useful
+    if (!profileData) {
+      const fallbackPlan = user.email === OWNER_EMAIL ? 'pro' : 'free';
+      if (metricCount) metricCount.textContent = '0';
+      if (metricPlan) metricPlan.textContent = fallbackPlan === 'pro' ? 'Pro' : 'Gratis';
+      if (metricFree) metricFree.textContent = fallbackPlan === 'pro' ? 'Ilimitadas' : String(FREE_LIMIT);
+      if (upgradeSection) upgradeSection.classList.toggle('hidden', fallbackPlan === 'pro');
+      if (listingsContainer) listingsContainer.innerHTML =
+        '<p class="dashboard-empty">No se pudo conectar con el servidor.<br><a href="" onclick="location.reload();return false;">Intentar de nuevo →</a></p>';
+      return;
     }
 
     const profile = profileData.user;
@@ -74,8 +86,14 @@ document.addEventListener('DOMContentLoaded', () => {
       upgradeSection.classList.toggle('hidden', profile.plan === 'pro');
     }
 
-    const listingsResponse = await authFetch(`/api/listings/user/${user.uid}`);
-    const listings = await listingsResponse.json();
+    let listings = [];
+    try {
+      const listingsResponse = await authFetch(`/api/listings/user/${user.uid}`);
+      const data = await listingsResponse.json();
+      listings = Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.warn('Listings fetch failed:', err.message);
+    }
 
     if (!listings.length) {
       listingsContainer.innerHTML = '<p class="dashboard-empty">Aún no has publicado nada. <a href="/publish">Publica tu primer anuncio gratis →</a></p>';
