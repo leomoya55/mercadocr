@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producto - MercadoCR</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/product.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">MercadoCR</div>
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="listings.html">Anuncios</a></li>
+                <li class="nav-hidden" data-auth-only><a href="publish.html" data-publish-cta>Publicar</a></li>
+                <li><a href="pricing.html">Planes</a></li>
+                <li data-guest-only><a href="login.html">Iniciar sesión</a></li>
+                <li class="nav-hidden nav-user-menu" data-auth-only id="nav-user-menu">
+                    <button class="nav-user-btn" id="nav-user-btn" type="button"></button>
+                    <ul class="nav-dropdown">
+                        <li><a href="dashboard.html">Mi panel</a></li>
+                        <li><a href="settings.html">Configuración</a></li>
+                        <li><button class="nav-logout-btn" id="nav-logout" type="button">Salir</button></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="product-page" id="product-detail">
+            <!-- Product details will be loaded here -->
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 MercadoCR. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth-redirect.js"></script>
+    <script src="js/product.js"></script>
+</body>
+</html>

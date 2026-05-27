@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Publicar Anuncio - MercadoCR</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/publish.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">MercadoCR</div>
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="listings.html">Anuncios</a></li>
+                <li class="nav-hidden" data-auth-only><a href="publish.html" data-publish-cta>Publicar</a></li>
+                <li><a href="pricing.html">Planes</a></li>
+                <li data-guest-only><a href="login.html">Iniciar sesión</a></li>
+                <li class="nav-hidden nav-user-menu" data-auth-only id="nav-user-menu">
+                    <button class="nav-user-btn" id="nav-user-btn" type="button"></button>
+                    <ul class="nav-dropdown">
+                        <li><a href="dashboard.html">Mi panel</a></li>
+                        <li><a href="settings.html">Configuración</a></li>
+                        <li><button class="nav-logout-btn" id="nav-logout" type="button">Salir</button></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="publish-page">
+            <h2>Publica tu anuncio</h2>
+            <p>Tu primer anuncio es gratis. Luego puedes pagar ₡500 por anuncio o hacerte Pro.</p>
+            <div class="publish-status" id="publish-status">Cargando tu plan...</div>
+            <div class="publish-payments hidden" id="publish-payments">
+                <div class="payment-card">
+                    <h3>Publicación individual</h3>
+                    <div class="payment-price">₡500</div>
+                    <p>Una sola publicación adicional. Sin suscripción.</p>
+                    <button type="button" class="cta-button" id="payment-button">Pagar ₡500</button>
+                </div>
+                <div class="payment-card">
+                    <h3>Basic mensual</h3>
+                    <div class="payment-price">₡5,000<span>/mes</span></div>
+                    <p>Hasta 20 anuncios activos. Renovación mensual.</p>
+                    <button type="button" class="cta-button" id="basic-button">Activar Basic</button>
+                </div>
+                <div class="payment-card">
+                    <h3>Pro mensual</h3>
+                    <div class="payment-price">₡10,000<span>/mes</span></div>
+                    <p>Anuncios ilimitados + destacado en todos tus productos.</p>
+                    <button type="button" class="cta-button secondary" id="pro-button">Hacerme Pro</button>
+                </div>
+            </div>
+            <form id="publish-form" class="hidden">
+                <label for="name">Nombre del producto</label>
+                <input type="text" id="name" name="name" required>
+
+                <label for="description">Descripción</label>
+                <textarea id="description" name="description" rows="4" required></textarea>
+
+                <label for="price">Precio (₡)</label>
+                <input type="number" id="price" name="price" required>
+
+                <label for="category">Categoría</label>
+                <select id="category" name="category" required>
+                    <option value="">Selecciona una categoría</option>
+                    <option value="Ropa y accesorios">Ropa y accesorios</option>
+                    <option value="Electrónica">Electrónica</option>
+                    <option value="Hogar y muebles">Hogar y muebles</option>
+                    <option value="Vehículos">Vehículos</option>
+                    <option value="Servicios">Servicios</option>
+                    <option value="Otros">Otros</option>
+                </select>
+
+                <label for="photos">Fotos</label>
+                <input type="file" id="photos" name="photos" multiple accept="image/*">
+                <small>Sube una o más fotos de tu producto.</small>
+
+
+                <label for="provincia">Provincia</label>
+                <select id="provincia" name="provincia" required>
+                    <option value="">Selecciona tu provincia</option>
+                    <option value="San José">San José</option>
+                    <option value="Alajuela">Alajuela</option>
+                    <option value="Cartago">Cartago</option>
+                    <option value="Heredia">Heredia</option>
+                    <option value="Guanacaste">Guanacaste</option>
+                    <option value="Puntarenas">Puntarenas</option>
+                    <option value="Limón">Limón</option>
+                </select>
+
+                <label for="contact">Información de contacto (teléfono o email)</label>
+                <input type="text" id="contact" name="contact" required>
+
+                <button type="submit" class="cta-button" id="submit-button">Confirmar Publicación</button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 MercadoCR. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth-redirect.js"></script>
+    <script src="js/publish.js"></script>
+</body>
+</html>

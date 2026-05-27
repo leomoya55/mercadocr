@@ -1,0 +1,90 @@
+.publish-page {
+    padding: 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.publish-status {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: #141414;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #aaa;
+}
+
+.publish-payments {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.payment-card {
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.payment-price {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #e8c97a;
+}
+
+.payment-price span {
+    font-size: 1rem;
+    font-weight: 400;
+    color: #aaa;
+}
+
+.payment-card .cta-button {
+    margin-top: auto;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+}
+
+#publish-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+#publish-form label {
+    font-weight: bold;
+}
+
+#publish-form input, #publish-form textarea, #publish-form select {
+    padding: 0.8rem;
+    border-radius: 5px;
+    border: 1px solid #e8c97a;
+    background-color: #1a1a1a;
+    color: #fff;
+    font-size: 1rem;
+}
+
+#publish-form small {
+    color: #aaa;
+}
+
+#publish-form small a {
+    color: #e8c97a;
+}
+
+#submit-button {
+    margin-top: 1rem;
+    cursor: pointer;
+}
+
+#submit-button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}

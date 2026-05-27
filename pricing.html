@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planes - MercadoCR</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/pricing.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">MercadoCR</div>
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="listings.html">Anuncios</a></li>
+                <li class="nav-hidden" data-auth-only><a href="publish.html" data-publish-cta>Publicar</a></li>
+                <li><a href="pricing.html">Planes</a></li>
+                <li data-guest-only><a href="login.html">Iniciar sesión</a></li>
+                <li class="nav-hidden nav-user-menu" data-auth-only id="nav-user-menu">
+                    <button class="nav-user-btn" id="nav-user-btn" type="button"></button>
+                    <ul class="nav-dropdown">
+                        <li><a href="dashboard.html">Mi panel</a></li>
+                        <li><a href="settings.html">Configuración</a></li>
+                        <li><button class="nav-logout-btn" id="nav-logout" type="button">Salir</button></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="pricing-page">
+        <section class="pricing-hero">
+            <h2>Planes simples y transparentes</h2>
+            <p>Comenzá gratis y publicá a tu ritmo. Mejorá tu plan cuando quieras.</p>
+        </section>
+
+        <section class="pricing-cards">
+            <div class="pricing-card">
+                <h3>Gratis</h3>
+                <div class="price">₡0</div>
+                <ul>
+                    <li>1 anuncio gratis</li>
+                    <li>₡500 por anuncio adicional</li>
+                    <li>Sin destacado</li>
+                </ul>
+                <a href="publish.html" class="cta-button" data-publish-cta>Publicar gratis</a>
+            </div>
+
+            <div class="pricing-card highlighted">
+                <div class="popular-badge">Más popular</div>
+                <h3>Basic</h3>
+                <div class="price">₡5,000<span>/mes</span></div>
+                <ul>
+                    <li>Hasta 20 anuncios activos</li>
+                    <li>Renovación mensual</li>
+                    <li>Sin destacado</li>
+                </ul>
+                <button class="cta-button" id="pricing-basic">Activar Basic</button>
+            </div>
+
+            <div class="pricing-card">
+                <h3>Pro</h3>
+                <div class="price">₡10,000<span>/mes</span></div>
+                <ul>
+                    <li>Anuncios ilimitados</li>
+                    <li>Badge destacado en todos tus anuncios</li>
+                    <li>Soporte prioritario</li>
+                </ul>
+                <button class="cta-button" id="pricing-pro">Activar Pro</button>
+            </div>
+        </section>
+
+        <section class="pricing-compare">
+            <h3>Comparación de planes</h3>
+            <div class="comparison-table">
+                <div class="row header">
+                    <div>Beneficio</div>
+                    <div>Gratis</div>
+                    <div>Basic</div>
+                    <div>Pro</div>
+                </div>
+                <div class="row">
+                    <div>Primer anuncio gratis</div>
+                    <div>✅</div>
+                    <div>✅</div>
+                    <div>✅</div>
+                </div>
+                <div class="row">
+                    <div>Anuncios adicionales</div>
+                    <div>₡500 c/u</div>
+                    <div>Hasta 20</div>
+                    <div>Ilimitados</div>
+                </div>
+                <div class="row">
+                    <div>Destacado en resultados</div>
+                    <div>❌</div>
+                    <div>❌</div>
+                    <div>✅</div>
+                </div>
+                <div class="row">
+                    <div>Soporte prioritario</div>
+                    <div>❌</div>
+                    <div>❌</div>
+                    <div>✅</div>
+                </div>
+                <div class="row">
+                    <div>Precio mensual</div>
+                    <div>₡0</div>
+                    <div>₡5,000</div>
+                    <div>₡10,000</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 MercadoCR. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth-redirect.js"></script>
+    <script src="js/pricing.js"></script>
+</body>
+</html>

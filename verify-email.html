@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revisá tu correo - MercadoCR</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/verify-email.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">MercadoCR</div>
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="listings.html">Anuncios</a></li>
+                <li class="nav-hidden" data-auth-only><a href="publish.html" data-publish-cta>Publicar</a></li>
+                <li><a href="pricing.html">Planes</a></li>
+                <li data-guest-only><a href="login.html">Iniciar sesión</a></li>
+                <li class="nav-hidden nav-user-menu" data-auth-only id="nav-user-menu">
+                    <button class="nav-user-btn" id="nav-user-btn" type="button"></button>
+                    <ul class="nav-dropdown">
+                        <li><a href="dashboard.html">Mi panel</a></li>
+                        <li><a href="settings.html">Configuración</a></li>
+                        <li><button class="nav-logout-btn" id="nav-logout" type="button">Salir</button></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="verify-card">
+            <div class="verify-header">
+                <h2>Revisá tu correo 📧</h2>
+                <p class="verify-email" id="verify-email">Correo: <span id="verify-email-address">-</span></p>
+            </div>
+            <p class="verify-message">
+                Te enviamos un enlace de verificación. Hacé click en el link del correo para activar tu cuenta. Revisá también la carpeta de spam.
+            </p>
+            <div class="verify-timer" id="verify-timer">Podés reenviar el correo en: 60 segundos</div>
+            <button class="cta-button secondary hidden" id="resend-button">Reenviar correo de verificación</button>
+            <button class="cta-button" id="check-button">Ya verifiqué → Entrar</button>
+            <div class="verify-status" id="verify-status"></div>
+            <a class="verify-link" href="register.html">Usar otro correo</a>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 MercadoCR. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth-redirect.js"></script>
+    <script src="js/verify-email.js"></script>
+</body>
+</html>

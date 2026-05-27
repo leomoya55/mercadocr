@@ -1,0 +1,121 @@
+.pricing-page {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.pricing-hero {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.pricing-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.pricing-card {
+    background-color: #1a1a1a;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    position: relative;
+}
+
+.popular-badge {
+    display: inline-block;
+    background-color: #e8c97a;
+    color: #0d0d0d;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    margin-bottom: 0.75rem;
+}
+
+.pricing-card.highlighted {
+    border-color: #e8c97a;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.pricing-card .price {
+    font-size: 2rem;
+    color: #e8c97a;
+    margin: 1rem 0;
+}
+
+.pricing-compare {
+    margin-bottom: 2rem;
+}
+
+.comparison-table {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.comparison-table .row {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(3, 1fr);
+    gap: 0.5rem;
+    background-color: #141414;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+}
+
+.comparison-table .row.header {
+    background-color: #1a1a1a;
+    font-weight: 700;
+}
+
+.current-plan-btn {
+    background-color: #2a2a2a !important;
+    color: #e8c97a !important;
+    border: 1px solid #e8c97a;
+    cursor: default !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.pricing-cancel {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+}
+
+.pricing-cancel p {
+    margin: 0 0 0.75rem;
+    color: #aaa;
+}
+
+.cancel-sub-btn {
+    background: none;
+    border: 1px solid #555;
+    color: #888;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.cancel-sub-btn:hover {
+    border-color: #e08080;
+    color: #e08080;
+}
+
+@media (max-width: 700px) {
+    .comparison-table .row {
+        grid-template-columns: 1fr;
+        text-align: left;
+    }
+}

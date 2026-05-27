@@ -1,0 +1,73 @@
+.product-page {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.product-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 768px) {
+    .product-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.product-images img {
+    width: 100%;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+}
+
+.product-info h1 {
+    font-size: 2rem;
+    color: #e8c97a;
+}
+
+.product-info h1 .badge-featured {
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.product-price {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 1rem 0;
+}
+
+.product-description, .product-contact, .product-location, .product-seller {
+    margin-bottom: 1rem;
+}
+
+.product-seller p {
+    margin: 0.25rem 0;
+    color: #ccc;
+}
+
+.seller-phone {
+    font-size: 1rem;
+}
+
+.whatsapp-btn {
+    background-color: #25D366;
+    color: #fff;
+    margin-top: 0.5rem;
+    display: inline-block;
+}
+
+.whatsapp-btn:hover {
+    background-color: #1ebe57;
+}
+
+.contact-button {
+    background-color: #e8c97a;
+    color: #0d0d0d;
+    padding: 0.8rem 1.5rem;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    display: inline-block;
+}
