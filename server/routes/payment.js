@@ -27,8 +27,8 @@ router.post('/create-checkout-session', verifyToken, async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${req.headers.origin}/publish.html?payment_success=true&type=single`,
-        cancel_url: `${req.headers.origin}/publish.html?payment_canceled=true`,
+        success_url: `${req.headers.origin}/publish?payment_success=true&type=single`,
+        cancel_url: `${req.headers.origin}/publish?payment_canceled=true`,
         metadata: { uid, type: 'single' },
       });
       return res.json({ id: session.id, url: session.url });
@@ -42,7 +42,7 @@ router.post('/create-checkout-session', verifyToken, async (req, res) => {
         name: isPro ? 'Suscripcion Pro MercadoCR' : 'Suscripcion Basic MercadoCR',
         description: isPro
           ? 'Plan Pro mensual con anuncios ilimitados y destacados.'
-          : 'Plan Basic mensual con hasta 20 anuncios activos.',
+          : 'Plan Basic mensual con hasta 25 anuncios activos.',
       },
       unit_amount: isPro ? 1000000 : 500000,
       recurring: { interval: 'month' },
@@ -51,8 +51,8 @@ router.post('/create-checkout-session', verifyToken, async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price_data: priceData, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${req.headers.origin}/pricing.html?payment_success=true&type=${type}`,
-      cancel_url: `${req.headers.origin}/publish.html?payment_canceled=true`,
+      success_url: `${req.headers.origin}/pricing?payment_success=true&type=${type}`,
+      cancel_url: `${req.headers.origin}/publish?payment_canceled=true`,
       metadata: { uid, type },
       subscription_data: { metadata: { uid, type } },
     });

@@ -50,7 +50,7 @@ router.get('/:uid', verifyToken, async (req, res) => {
   const user = await User.findOne({ firebaseUid: req.params.uid });
   if (!user) return res.status(404).json('User not found');
 
-  const listingCount = await Listing.countDocuments({ author: req.params.uid });
+  const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
   res.json({ user, listingCount });
 });
 

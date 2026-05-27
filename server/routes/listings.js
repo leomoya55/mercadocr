@@ -4,9 +4,12 @@ const User = require('../models/user.model');
 const upload = require('../config/cloudinary');
 const { verifyToken } = require('../middleware/auth');
 
-// Get all listings — public
+const FREE_LIMIT  = 3;
+const BASIC_LIMIT = 25;
+
+// Get all active listings — public
 router.get('/', (req, res) => {
-  Listing.find()
+  Listing.find({ status: { $ne: 'sold' } })
     .sort({ featured: -1, createdAt: -1 })
     .then(listings => res.json(listings))
     .catch(err => res.status(400).json('Error: ' + err));
@@ -21,29 +24,33 @@ router.post('/add', verifyToken, upload.array('photos'), async (req, res) => {
       return res.status(400).json('At least one photo is required');
     }
     if (!provincia) return res.status(400).json('Provincia is required');
+
     const photos = req.files.map(file => file.path);
     const user = await User.findOne({ firebaseUid: uid });
     if (!user) return res.status(404).json('User not found');
 
+    // Count only active (non-sold) listings for limit checks
+    const activeCount = await Listing.countDocuments({ author: uid, status: { $ne: 'sold' } });
+
     let featured = false;
+
     if (user.plan === 'pro') {
       featured = true;
     } else if (user.plan === 'basic') {
-      const count = await Listing.countDocuments({ author: uid });
-      if (count >= 20) {
+      if (activeCount >= BASIC_LIMIT) {
         return res.status(402).json({ error: 'Basic plan limit reached', code: 'LIMIT_REACHED' });
       }
-    } else if (user.plan === 'free') {
-      if (!user.freeListingUsed) {
-        user.freeListingUsed = true;
+    } else {
+      // Free plan
+      if (activeCount < FREE_LIMIT) {
+        // within free limit — no credit consumed
       } else if (user.singlePostCredits > 0) {
         user.singlePostCredits -= 1;
+        await user.save();
       } else {
         return res.status(402).json({ error: 'Payment required', code: 'PAYMENT_REQUIRED' });
       }
     }
-    user.listingsCount = (user.listingsCount || 0) + 1;
-    await user.save();
 
     const newListing = new Listing({ name, description, price, category, photos, contact, provincia, author: uid, featured });
     await newListing.save();
@@ -54,15 +61,15 @@ router.post('/add', verifyToken, upload.array('photos'), async (req, res) => {
   }
 });
 
-// Get listings by user — public (listings are public)
+// Get listings by user — public
 router.get('/user/:uid', (req, res) => {
   Listing.find({ author: req.params.uid })
-    .sort({ createdAt: -1 })
+    .sort({ status: 1, createdAt: -1 }) // active first, then sold
     .then(listings => res.json(listings))
     .catch(err => res.status(400).json('Error: ' + err));
 });
 
-// Get listing by ID — public, includes seller public info
+// Get listing by ID — public, includes seller info
 router.get('/:id', async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id).lean();
@@ -102,6 +109,23 @@ router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res)
   }
 });
 
+// Mark listing as sold — auth required, must own listing
+router.post('/mark-sold/:id', verifyToken, async (req, res) => {
+  try {
+    const uid = req.uid;
+    const listing = await Listing.findById(req.params.id);
+    if (!listing) return res.status(404).json('Listing not found');
+    if (listing.author !== uid) return res.status(403).json('Not authorized');
+
+    listing.status = 'sold';
+    await listing.save();
+    res.json('Listing marked as sold');
+  } catch (err) {
+    console.error('Mark sold error:', err);
+    res.status(500).json('Error: ' + err.message);
+  }
+});
+
 // Delete listing — auth required, must own listing
 router.post('/delete/:id', verifyToken, async (req, res) => {
   try {
@@ -111,7 +135,6 @@ router.post('/delete/:id', verifyToken, async (req, res) => {
     if (listing.author !== uid) return res.status(403).json('Not authorized');
 
     await listing.deleteOne();
-    await User.findOneAndUpdate({ firebaseUid: uid }, { $inc: { listingsCount: -1 } });
     res.json('Listing deleted');
   } catch (err) {
     console.error('Delete listing error:', err);

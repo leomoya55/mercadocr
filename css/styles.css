@@ -219,6 +219,30 @@ footer {
     letter-spacing: 0.03em;
 }
 
+.badge-sold {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    background-color: rgba(224, 128, 128, 0.15);
+    color: #e08080;
+    border: 1px solid #e08080;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.btn-mark-sold {
+    background: transparent;
+    border: 1px solid #e08080;
+    color: #e08080;
+    cursor: pointer;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+}
+.btn-mark-sold:hover { background: rgba(224,128,128,0.12); }
+
 /* Nav auth-state visibility */
 .nav-hidden { display: none !important; }
 

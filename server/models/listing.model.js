@@ -11,7 +11,8 @@ const listingSchema = new Schema({
     contact: { type: String, required: true },
     provincia: { type: String, required: true },
     author: { type: String, required: true }, // Firebase UID
-    featured: { type: Boolean, default: false }
+    featured: { type: Boolean, default: false },
+    status: { type: String, enum: ['active', 'sold'], default: 'active' },
 }, {
     timestamps: true,
 });

@@ -7,12 +7,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const upgradeSection = document.getElementById('dashboard-upgrade');
   const upgradeButton = document.getElementById('upgrade-pro');
 
-  const loadDashboard = async (user) => {
-    await authFetch('/api/users/ensure', {
-      method: 'POST',
-      body: JSON.stringify({ email: user.email }),
-    });
+  const FREE_LIMIT  = 3;
+  const BASIC_LIMIT = 25;
 
+  const loadDashboard = async (user) => {
     const profileResponse = await authFetch(`/api/users/${user.uid}`);
     const profileData = await profileResponse.json();
     const profile = profileData.user;
@@ -23,21 +21,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const planLabels = { free: 'Gratis', basic: 'Basic', pro: 'Pro' };
     if (metricPlan) metricPlan.textContent = planLabels[profile.plan] || 'Gratis';
 
-    // "Publicaciones disponibles" metric
+    const credits = profile.singlePostCredits || 0;
+
     if (metricFree) {
       if (profile.plan === 'pro') {
         metricFree.textContent = 'Ilimitadas';
       } else if (profile.plan === 'basic') {
-        metricFree.textContent = `${listingCount}/20`;
-      } else if (!profile.freeListingUsed) {
-        metricFree.textContent = '1 gratis';
+        metricFree.textContent = `${listingCount}/${BASIC_LIMIT}`;
       } else {
-        metricFree.textContent = 'Ninguna';
+        const used = Math.min(listingCount, FREE_LIMIT);
+        metricFree.textContent = listingCount < FREE_LIMIT
+          ? `${listingCount}/${FREE_LIMIT}`
+          : credits > 0 ? `${credits} crédito${credits !== 1 ? 's' : ''}` : `${FREE_LIMIT}/${FREE_LIMIT}`;
       }
     }
 
-    // Credits card — only show for free-plan users
-    const credits = profile.singlePostCredits || 0;
+    // Credits card — only for free-plan users
     const creditsCard = document.getElementById('metric-credits-card');
     const metricCredits = document.getElementById('metric-credits');
     if (creditsCard && profile.plan === 'free') {
@@ -63,18 +62,24 @@ document.addEventListener('DOMContentLoaded', () => {
     listings.forEach(listing => {
       const card = document.createElement('div');
       card.className = 'listing-item';
-      const featuredBadge = listing.featured ? '<span class="badge-featured">Destacado</span>' : '';
+      const isSold = listing.status === 'sold';
+      const featuredBadge = listing.featured && !isSold ? '<span class="badge-featured">Destacado</span>' : '';
+      const soldBadge = isSold ? '<span class="badge-sold">Vendido</span>' : '';
+      const editBtn = !isSold ? `<button data-edit="${listing._id}">Editar</button>` : '';
+      const markSoldBtn = !isSold ? `<button data-mark-sold="${listing._id}" class="btn-mark-sold">Marcar vendido</button>` : '';
+
       card.innerHTML = `
-        <img src="${escapeHtml(listing.photos[0])}" alt="${escapeHtml(listing.name)}">
+        <img src="${escapeHtml(listing.photos[0])}" alt="${escapeHtml(listing.name)}"${isSold ? ' style="opacity:0.55"' : ''}>
         <div class="listing-item-content">
           <div class="listing-item-title">${escapeHtml(listing.name)}</div>
           <div class="listing-item-meta">
             <div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>
-            ${featuredBadge}
+            ${featuredBadge}${soldBadge}
           </div>
           ${listing.provincia ? `<div class="listing-item-location">📍 ${escapeHtml(listing.provincia)}</div>` : ''}
           <div class="dashboard-actions">
-            <button data-edit="${listing._id}">Editar</button>
+            ${editBtn}
+            ${markSoldBtn}
             <button data-delete="${listing._id}">Eliminar</button>
           </div>
         </div>
@@ -84,17 +89,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     listingsContainer.querySelectorAll('[data-edit]').forEach(button => {
       button.addEventListener('click', () => {
-        window.location.href = `publish.html?edit=${button.getAttribute('data-edit')}`;
+        window.location.href = `/publish?edit=${button.getAttribute('data-edit')}`;
+      });
+    });
+
+    listingsContainer.querySelectorAll('[data-mark-sold]').forEach(button => {
+      button.addEventListener('click', async () => {
+        if (!confirm('¿Marcar este anuncio como vendido? Quedará archivado y liberará un espacio para publicar otro.')) return;
+        button.disabled = true;
+        button.textContent = 'Marcando...';
+        try {
+          await authFetch(`/api/listings/mark-sold/${button.getAttribute('data-mark-sold')}`, { method: 'POST' });
+          window.location.reload();
+        } catch {
+          button.disabled = false;
+          button.textContent = 'Marcar vendido';
+        }
       });
     });
 
     listingsContainer.querySelectorAll('[data-delete]').forEach(button => {
       button.addEventListener('click', async () => {
         if (!confirm('¿Seguro que deseas eliminar este anuncio?')) return;
-        await authFetch(`/api/listings/delete/${button.getAttribute('data-delete')}`, {
-          method: 'POST',
-        });
-        window.location.reload();
+        button.disabled = true;
+        button.textContent = 'Eliminando...';
+        try {
+          await authFetch(`/api/listings/delete/${button.getAttribute('data-delete')}`, { method: 'POST' });
+          window.location.reload();
+        } catch {
+          button.disabled = false;
+          button.textContent = 'Eliminar';
+        }
       });
     });
   };

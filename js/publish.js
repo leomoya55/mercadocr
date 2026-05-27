@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const basicButton  = document.getElementById('basic-button');
   const proButton    = document.getElementById('pro-button');
 
+  const FREE_LIMIT  = 3;
+  const BASIC_LIMIT = 25;
+
   const startCheckout = async (type, btn) => {
     const user = auth.currentUser;
     if (!user) { window.location.href = '/login'; return; }
@@ -80,11 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setStatus('Verificando tu plan...');
 
     try {
-      await authFetch('/api/users/ensure', {
-        method: 'POST',
-        body: JSON.stringify({ email: user.email }),
-      });
-
       editId = new URLSearchParams(window.location.search).get('edit');
       await initEditMode(user.uid);
       if (isEditMode) return;
@@ -93,29 +91,30 @@ document.addEventListener('DOMContentLoaded', () => {
       const profile = profileData.user;
       if (!profile) throw new Error('Could not load profile');
       const listingCount = profileData.listingCount || 0;
-
       const credits = profile.singlePostCredits || 0;
 
       if (profile.plan === 'pro') {
-        setStatus('Plan Pro activo. Puedes publicar sin límites.');
+        setStatus('Plan Pro · Publica sin límites.');
         showForm();
       } else if (profile.plan === 'basic') {
-        if (listingCount >= 20) {
-          setStatus('Alcanzaste el límite de 20 anuncios del plan Basic. Mejora a Pro o compra una publicación individual.');
+        if (listingCount >= BASIC_LIMIT) {
+          setStatus(`Alcanzaste el límite de ${BASIC_LIMIT} anuncios del plan Basic. Mejora a Pro o compra una publicación individual.`);
           showPayments();
         } else {
-          setStatus(`Plan Basic activo. Anuncios: ${listingCount}/20.`);
+          setStatus(`Plan Basic · ${listingCount}/${BASIC_LIMIT} anuncios activos.`);
           showForm();
         }
-      } else if (!profile.freeListingUsed) {
-        setStatus('Tu primer anuncio es completamente gratis.');
-        showForm();
-      } else if (credits > 0) {
-        setStatus(`Tienes ${credits} publicación${credits > 1 ? 'es' : ''} adicional${credits > 1 ? 'es' : ''} disponible${credits > 1 ? 's' : ''}.`);
-        showForm();
       } else {
-        setStatus('Elige cómo quieres publicar tu próximo anuncio.');
-        showPayments();
+        if (listingCount < FREE_LIMIT) {
+          setStatus(`Plan Gratuito · ${listingCount}/${FREE_LIMIT} anuncios activos.`);
+          showForm();
+        } else if (credits > 0) {
+          setStatus(`Tienes ${credits} crédito${credits > 1 ? 's' : ''} de publicación disponible${credits > 1 ? 's' : ''}.`);
+          showForm();
+        } else {
+          setStatus(`Alcanzaste el límite de ${FREE_LIMIT} anuncios gratuitos. Elige cómo continuar:`);
+          showPayments();
+        }
       }
     } catch (err) {
       console.error(err);
@@ -132,7 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
       submitButton.textContent = 'Publicando...';
 
       const formData = new FormData(form);
-      // author is derived from the verified token on the server — do not send uid in body
 
       try {
         const endpoint = isEditMode

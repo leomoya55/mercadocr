@@ -39,11 +39,12 @@ app.use('/api/', apiLimiter);
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
-// Redirect .html URLs to clean paths
+// Redirect .html URLs to clean paths (preserve query string)
 app.use((req, res, next) => {
   if (req.path.endsWith('.html')) {
     const base = req.path.slice(0, -5);
-    return res.redirect(301, base === '/index' ? '/' : base);
+    const clean = base === '/index' ? '/' : base;
+    return res.redirect(301, clean + req.url.slice(req.path.length));
   }
   next();
 });
