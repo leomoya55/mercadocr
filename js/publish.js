@@ -118,8 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     form.description.value = listing.description;
     form.price.value = listing.price;
     form.category.value = listing.category;
-    form.provincia.value = listing.provincia || '';
-    form.contact.value = listing.contact;
     submitButton.textContent = 'Guardar cambios';
     showForm();
   };
@@ -160,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
       applyPlanUI(profile.plan, listingCount, credits);
     } catch (err) {
       console.error(err);
-      if (!cached) setStatus('Error al verificar tu plan. Por favor recarga la página.');
+      // Form is already visible by default — server enforces limits on submit
     }
   });
 
