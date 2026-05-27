@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const metricFree = document.getElementById('metric-free');
   const metricPlan = document.getElementById('metric-plan');
   const listingsContainer = document.getElementById('dashboard-listings');
-  const loading = document.getElementById('dashboard-loading');
   const upgradeSection = document.getElementById('dashboard-upgrade');
   const upgradeButton = document.getElementById('upgrade-pro');
 
@@ -37,12 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (profile.plan === 'pro') {
         metricFree.textContent = 'Ilimitadas';
       } else if (profile.plan === 'basic') {
-        metricFree.textContent = `${listingCount}/${BASIC_LIMIT}`;
+        metricFree.textContent = Math.max(0, BASIC_LIMIT - listingCount);
       } else {
-        const used = Math.min(listingCount, FREE_LIMIT);
-        metricFree.textContent = listingCount < FREE_LIMIT
-          ? `${listingCount}/${FREE_LIMIT}`
-          : credits > 0 ? `${credits} crédito${credits !== 1 ? 's' : ''}` : `${FREE_LIMIT}/${FREE_LIMIT}`;
+        const remaining = Math.max(0, FREE_LIMIT - listingCount);
+        metricFree.textContent = remaining > 0 ? remaining
+          : credits > 0 ? `${credits} crédito${credits !== 1 ? 's' : ''}` : 0;
       }
     }
 
@@ -58,13 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
       upgradeSection.classList.toggle('hidden', profile.plan === 'pro');
     }
 
-    if (loading) loading.classList.remove('hidden');
     const listingsResponse = await authFetch(`/api/listings/user/${user.uid}`);
     const listings = await listingsResponse.json();
-    if (loading) loading.classList.add('hidden');
 
     if (!listings.length) {
-      listingsContainer.innerHTML = '<div class="loading">Aun no tienes anuncios publicados. <a href="/publish">Publica tu primer anuncio gratis</a></div>';
+      listingsContainer.innerHTML = '<p class="dashboard-empty">Aún no has publicado nada. <a href="/publish">Publica tu primer anuncio gratis →</a></p>';
       return;
     }
 
@@ -141,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loadDashboard(user).catch(err => {
       console.error(err);
-      if (loading) loading.textContent = 'Error al cargar el panel.';
+      if (listingsContainer) listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. Recarga la página.</p>';
     });
   });
 

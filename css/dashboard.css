@@ -63,3 +63,7 @@
     border-color: #e8c97a;
     color: #e8c97a;
 }
+
+.dashboard-empty { color: #888; font-size: 0.95rem; padding: 1.5rem 0; }
+.dashboard-empty a { color: #e8c97a; text-decoration: none; }
+.dashboard-empty a:hover { text-decoration: underline; }
