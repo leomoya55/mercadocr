@@ -27,16 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const loading = document.createElement('div');
-  loading.className = 'loading';
-  loading.textContent = 'Cargando anuncios...';
-  listingsPage.insertBefore(loading, listingsContainer);
-
   fetch(API_BASE_URL + '/api/listings')
     .then(response => response.json())
     .then(data => {
       allListings = data;
-      loading.remove();
       displayListings(allListings);
     })
     .catch(error => console.error('Error fetching listings:', error));

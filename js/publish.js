@@ -39,11 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
   proButton?.addEventListener('click',     () => startCheckout('pro',    proButton));
 
   const urlParams = new URLSearchParams(window.location.search);
-  const returnType = urlParams.get('type');
+  const returnedFromPayment = urlParams.get('payment_success') === 'true';
   if (urlParams.get('payment_canceled') === 'true') {
     window.history.replaceState({}, document.title, '/publish');
     if (statusBox) statusBox.textContent = 'Pago cancelado. Puedes intentarlo de nuevo cuando quieras.';
-  } else if (urlParams.get('payment_success') === 'true' && returnType === 'single') {
+  } else if (returnedFromPayment && urlParams.get('type') === 'single') {
     window.history.replaceState({}, document.title, '/publish');
     if (statusBox) statusBox.textContent = 'Pago recibido. Cargando tu plan...';
   }
@@ -56,9 +56,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const showForm = () => { form?.classList.remove('hidden'); paymentsBox?.classList.add('hidden'); };
   const showPayments = () => { form?.classList.add('hidden'); paymentsBox?.classList.remove('hidden'); };
 
+  function applyPlanUI(plan, listingCount, credits) {
+    if (plan === 'pro') {
+      setStatus('Plan Pro · Publica sin límites.');
+      showForm();
+    } else if (plan === 'basic') {
+      if (listingCount >= BASIC_LIMIT) {
+        setStatus(`Alcanzaste el límite de ${BASIC_LIMIT} anuncios del plan Basic. Mejora a Pro o compra una publicación individual.`);
+        showPayments();
+      } else {
+        setStatus(`Plan Basic · ${listingCount}/${BASIC_LIMIT} anuncios activos.`);
+        showForm();
+      }
+    } else {
+      if (listingCount < FREE_LIMIT) {
+        setStatus(`Plan Gratuito · ${listingCount}/${FREE_LIMIT} anuncios activos.`);
+        showForm();
+      } else if (credits > 0) {
+        setStatus(`Tienes ${credits} crédito${credits > 1 ? 's' : ''} de publicación disponible${credits > 1 ? 's' : ''}.`);
+        showForm();
+      } else {
+        setStatus(`Alcanzaste el límite de ${FREE_LIMIT} anuncios gratuitos. Elige cómo continuar:`);
+        showPayments();
+      }
+    }
+  }
+
   const initEditMode = async (uid) => {
     if (!editId) return;
-
     const response = await fetch(API_BASE_URL + `/api/listings/${editId}`);
     const listing = await response.json();
     if (!listing || listing.author !== uid) {
@@ -80,45 +105,37 @@ document.addEventListener('DOMContentLoaded', () => {
   auth.onAuthStateChanged(async (user) => {
     if (!user) { window.location.href = '/login'; return; }
     currentUser = user;
-    setStatus('Verificando tu plan...');
+
+    editId = new URLSearchParams(window.location.search).get('edit');
+    await initEditMode(user.uid);
+    if (isEditMode) return;
+
+    // Show cached plan instantly while fresh data loads
+    // Skip cache when returning from payment so updated credits are fetched
+    const cacheKey = `mcr_plan_${user.uid}`;
+    if (returnedFromPayment) sessionStorage.removeItem(cacheKey);
+    const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+    if (cached && (Date.now() - cached.ts) < 120000) {
+      applyPlanUI(cached.plan, cached.listingCount, cached.credits);
+    } else {
+      setStatus('Verificando tu plan...');
+    }
 
     try {
-      editId = new URLSearchParams(window.location.search).get('edit');
-      await initEditMode(user.uid);
-      if (isEditMode) return;
-
       const profileData = await authFetch(`/api/users/${user.uid}`).then(r => r.json());
       const profile = profileData.user;
       if (!profile) throw new Error('Could not load profile');
       const listingCount = profileData.listingCount || 0;
       const credits = profile.singlePostCredits || 0;
 
-      if (profile.plan === 'pro') {
-        setStatus('Plan Pro · Publica sin límites.');
-        showForm();
-      } else if (profile.plan === 'basic') {
-        if (listingCount >= BASIC_LIMIT) {
-          setStatus(`Alcanzaste el límite de ${BASIC_LIMIT} anuncios del plan Basic. Mejora a Pro o compra una publicación individual.`);
-          showPayments();
-        } else {
-          setStatus(`Plan Basic · ${listingCount}/${BASIC_LIMIT} anuncios activos.`);
-          showForm();
-        }
-      } else {
-        if (listingCount < FREE_LIMIT) {
-          setStatus(`Plan Gratuito · ${listingCount}/${FREE_LIMIT} anuncios activos.`);
-          showForm();
-        } else if (credits > 0) {
-          setStatus(`Tienes ${credits} crédito${credits > 1 ? 's' : ''} de publicación disponible${credits > 1 ? 's' : ''}.`);
-          showForm();
-        } else {
-          setStatus(`Alcanzaste el límite de ${FREE_LIMIT} anuncios gratuitos. Elige cómo continuar:`);
-          showPayments();
-        }
-      }
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        plan: profile.plan, listingCount, credits, ts: Date.now(),
+      }));
+
+      applyPlanUI(profile.plan, listingCount, credits);
     } catch (err) {
       console.error(err);
-      setStatus('Error al verificar tu plan. Por favor recarga la página.');
+      if (!cached) setStatus('Error al verificar tu plan. Por favor recarga la página.');
     }
   });
 
@@ -140,6 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await authFetch(endpoint, { method: 'POST', body: formData });
 
         if (response.ok) {
+          // Invalidate plan cache so dashboard/publish reload fresh counts
+          const cacheKey = `mcr_plan_${currentUser.uid}`;
+          sessionStorage.removeItem(cacheKey);
           alert(isEditMode ? 'Anuncio actualizado con exito.' : 'Anuncio publicado con exito!');
           window.location.href = '/dashboard';
         } else if (response.status === 402) {

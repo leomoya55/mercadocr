@@ -50,6 +50,12 @@ router.get('/:uid', verifyToken, async (req, res) => {
   const user = await User.findOne({ firebaseUid: req.params.uid });
   if (!user) return res.status(404).json('User not found');
 
+  // Owner always has Pro — persisted on every load so it survives subscription events
+  if (FOUNDER_EMAIL && user.email === FOUNDER_EMAIL && user.plan !== 'pro') {
+    user.plan = 'pro';
+    await user.save();
+  }
+
   const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
   res.json({ user, listingCount });
 });
