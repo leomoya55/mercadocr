@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     listingsContainer.innerHTML = '';
     listings.forEach(listing => {
       const listingElement = document.createElement('a');
-      listingElement.href = `product.html?id=${listing._id}`;
+      listingElement.href = `/product?id=${listing._id}`;
       listingElement.classList.add('listing-item');
       const featuredBadge = listing.featured ? '<span class="badge-featured">Destacado</span>' : '';
       listingElement.innerHTML = `

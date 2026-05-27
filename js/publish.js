@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const startCheckout = async (type, btn) => {
     const user = auth.currentUser;
-    if (!user) { window.location.href = 'login.html'; return; }
+    if (!user) { window.location.href = '/login'; return; }
     const originalText = btn.textContent;
     try {
       btn.disabled = true;
@@ -38,10 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const returnType = urlParams.get('type');
   if (urlParams.get('payment_canceled') === 'true') {
-    window.history.replaceState({}, document.title, 'publish.html');
+    window.history.replaceState({}, document.title, '/publish');
     if (statusBox) statusBox.textContent = 'Pago cancelado. Puedes intentarlo de nuevo cuando quieras.';
   } else if (urlParams.get('payment_success') === 'true' && returnType === 'single') {
-    window.history.replaceState({}, document.title, 'publish.html');
+    window.history.replaceState({}, document.title, '/publish');
     if (statusBox) statusBox.textContent = 'Pago recibido. Cargando tu plan...';
   }
 
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const listing = await response.json();
     if (!listing || listing.author !== uid) {
       alert('No tienes permisos para editar este anuncio.');
-      window.location.href = 'dashboard.html';
+      window.location.href = '/dashboard';
       return;
     }
     isEditMode = true;
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   auth.onAuthStateChanged(async (user) => {
-    if (!user) { window.location.href = 'login.html'; return; }
+    if (!user) { window.location.href = '/login'; return; }
     currentUser = user;
     setStatus('Verificando tu plan...');
 
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (response.ok) {
           alert(isEditMode ? 'Anuncio actualizado con exito.' : 'Anuncio publicado con exito!');
-          window.location.href = 'dashboard.html';
+          window.location.href = '/dashboard';
         } else if (response.status === 402) {
           setStatus('Necesitas un plan para publicar mas anuncios.');
           showPayments();

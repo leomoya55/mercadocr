@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loading) loading.classList.add('hidden');
 
     if (!listings.length) {
-      listingsContainer.innerHTML = '<div class="loading">Aun no tienes anuncios publicados. <a href="publish.html">Publica tu primer anuncio gratis</a></div>';
+      listingsContainer.innerHTML = '<div class="loading">Aun no tienes anuncios publicados. <a href="/publish">Publica tu primer anuncio gratis</a></div>';
       return;
     }
 
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   auth.onAuthStateChanged((user) => {
     if (!user) {
-      window.location.href = 'login.html';
+      window.location.href = '/login';
       return;
     }
     loadDashboard(user).catch(err => {
@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (upgradeButton) {
     upgradeButton.addEventListener('click', async () => {
       const user = auth.currentUser;
-      if (!user) { window.location.href = 'login.html'; return; }
+      if (!user) { window.location.href = '/login'; return; }
       try {
         upgradeButton.disabled = true;
         upgradeButton.textContent = 'Procesando...';

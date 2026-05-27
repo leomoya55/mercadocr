@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const startCheckout = async (type) => {
     const user = auth.currentUser;
-    if (!user) { window.location.href = 'login.html'; return; }
+    if (!user) { window.location.href = '/login'; return; }
     const btn = type === 'basic' ? basicButton : proButton;
     try {
       btn.disabled = true;
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (paymentSuccess) {
       const type = urlParams.get('type');
       alert(`Plan ${type === 'pro' ? 'Pro' : 'Basic'} activado con éxito. ¡Bienvenido!`);
-      window.history.replaceState({}, document.title, 'pricing.html');
+      window.history.replaceState({}, document.title, '/pricing');
     }
 
     if (user) {

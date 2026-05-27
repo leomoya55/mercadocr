@@ -46,36 +46,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
             }
 
-            // Send verification email — non-blocking so a timeout/error doesn't freeze the form.
-            // The user can resend from verify-email.html if needed.
-            try {
-                await Promise.race([
-                    user.sendEmailVerification(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-                ]);
-            } catch (verifyErr) {
-                console.warn('Could not send verification email:', verifyErr.message);
-            }
+            // Fire-and-forget — neither call blocks the redirect
+            user.sendEmailVerification().catch(e => console.warn('Verification email:', e.message));
 
-            // Create DB profile — non-blocking: if API is unreachable, registration still succeeds.
-            // Profile fields can be completed later via Settings.
-            try {
-                const token = await user.getIdToken();
+            user.getIdToken().then(token => {
                 const controller = new AbortController();
                 setTimeout(() => controller.abort(), 8000);
-                await fetch(API_BASE_URL + '/api/users/ensure', {
+                return fetch(API_BASE_URL + '/api/users/ensure', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ email, nombre, apellido, phone, provincia }),
                     signal: controller.signal,
                 });
-            } catch (apiErr) {
-                // API unreachable — profile will be created on first login
-                console.warn('Could not save profile during registration, will retry on login:', apiErr.message);
-            }
+            }).catch(e => console.warn('Profile API:', e.message));
 
             sessionStorage.setItem('verificationEmail', email);
-            window.location.href = 'verify-email.html';
+            window.location.href = '/verify-email';
 
         } catch (error) {
             submitButton.disabled = false;
@@ -84,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const friendlyCodes = {
                 'auth/email-already-in-use': {
                     msg: 'Este email ya tiene una cuenta.',
-                    link: 'login.html',
+                    link: '/login',
                     linkText: 'Inicia sesión aquí →',
                 },
                 'auth/weak-password': { msg: 'La contraseña debe tener al menos 6 caracteres.' },

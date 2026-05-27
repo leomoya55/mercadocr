@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await userRef.reload();
             if (userRef.emailVerified) {
                 sessionStorage.removeItem('verificationEmail');
-                window.location.href = 'index.html';
+                window.location.href = '/';
             } else {
                 statusLabel.textContent = 'Tu correo aún no está verificado. Revisá tu bandeja de entrada o spam.';
             }

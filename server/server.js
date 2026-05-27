@@ -39,8 +39,17 @@ app.use('/api/', apiLimiter);
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
+// Redirect .html URLs to clean paths
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html')) {
+    const base = req.path.slice(0, -5);
+    return res.redirect(301, base === '/index' ? '/' : base);
+  }
+  next();
+});
+
 // Serve static frontend from project root
-app.use(express.static(path.join(__dirname, '../')));
+app.use(express.static(path.join(__dirname, '../'), { extensions: ['html'] }));
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected'))

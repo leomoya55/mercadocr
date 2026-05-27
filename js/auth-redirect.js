@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
         link.addEventListener('click', event => {
             if (!auth.currentUser) {
                 event.preventDefault();
-                window.location.href = 'login.html';
+                window.location.href = '/login';
             }
         });
     });
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Logout
     document.getElementById('nav-logout')?.addEventListener('click', () => {
-        auth.signOut().then(() => { window.location.href = 'index.html'; });
+        auth.signOut().then(() => { window.location.href = '/'; });
     });
 
     // Show/hide nav items based on auth state

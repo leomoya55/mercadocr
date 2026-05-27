@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!user.emailVerified) {
                 await auth.signOut();
                 sessionStorage.setItem('verificationEmail', user.email);
-                window.location.href = 'verify-email.html';
+                window.location.href = '/verify-email';
                 return;
             }
 
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ email: user.email }),
             });
 
-            window.location.href = 'dashboard.html';
+            window.location.href = '/dashboard';
         } catch (error) {
             const friendlyCodes = {
                 'auth/user-not-found':     'Usuario o contraseña incorrecta.',
