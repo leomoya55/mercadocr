@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const showForm = () => { form?.classList.remove('hidden'); paymentsBox?.classList.add('hidden'); };
   const showPayments = () => { form?.classList.add('hidden'); paymentsBox?.classList.remove('hidden'); };
 
-  function setSubtitle(plan, listingCount) {
+  function setSubtitle(plan, listingCount, credits = 0) {
     if (!subtitle) return;
     if (plan === 'pro') {
       subtitle.textContent = 'Tu plan Pro te da publicaciones ilimitadas con destacado automático en todos tus anuncios.';
@@ -65,11 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const remaining = Math.max(0, BASIC_LIMIT - listingCount);
       subtitle.textContent = `Tu plan Basic incluye hasta ${BASIC_LIMIT} anuncios activos. Te quedan ${remaining} publicación${remaining !== 1 ? 'es' : ''} disponible${remaining !== 1 ? 's' : ''}.`;
     } else {
-      const remaining = Math.max(0, 3 - listingCount);
+      const remaining = Math.max(0, FREE_LIMIT - listingCount);
       if (remaining > 0) {
-        subtitle.textContent = `Plan gratuito · ${remaining} de 3 anuncios gratuitos disponibles. Publica, vende, y reutiliza el espacio cuando quieras.`;
+        subtitle.textContent = `Plan gratuito · ${remaining} de ${FREE_LIMIT} anuncios gratuitos disponibles.`;
+      } else if (credits > 0) {
+        subtitle.textContent = `Tienes ${credits} crédito${credits !== 1 ? 's' : ''} de publicación individual disponible${credits !== 1 ? 's' : ''}.`;
       } else {
-        subtitle.textContent = 'Alcanzaste el límite de 3 anuncios gratuitos. Elige una opción para continuar publicando.';
+        subtitle.textContent = `Alcanzaste el límite de ${FREE_LIMIT} anuncios gratuitos. Elige una opción para continuar publicando.`;
       }
     }
   }
@@ -78,29 +80,15 @@ document.addEventListener('DOMContentLoaded', () => {
   showForm();
 
   function applyPlanUI(plan, listingCount, credits) {
-    setSubtitle(plan, listingCount);
+    setSubtitle(plan, listingCount, credits);
     if (plan === 'pro') {
-      setStatus('');
       showForm();
     } else if (plan === 'basic') {
-      if (listingCount >= BASIC_LIMIT) {
-        setStatus(`Alcanzaste el límite de ${BASIC_LIMIT} anuncios del plan Basic. Mejora a Pro o compra una publicación individual.`);
-        showPayments();
-      } else {
-        setStatus('');
-        showForm();
-      }
+      if (listingCount >= BASIC_LIMIT) showPayments();
+      else showForm();
     } else {
-      if (listingCount < FREE_LIMIT) {
-        setStatus('');
-        showForm();
-      } else if (credits > 0) {
-        setStatus(`Tienes ${credits} crédito${credits > 1 ? 's' : ''} de publicación disponible${credits > 1 ? 's' : ''}.`);
-        showForm();
-      } else {
-        setStatus('');
-        showPayments();
-      }
+      if (listingCount < FREE_LIMIT || credits > 0) showForm();
+      else showPayments();
     }
   }
 
@@ -128,37 +116,50 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!user) { window.location.href = '/login'; return; }
     currentUser = user;
 
-    // Owner: set Pro subtitle immediately, no API call needed
-    if (user.email === OWNER_EMAIL) setSubtitle('pro', 0);
+    // Owner: apply Pro UI immediately — no API call needed
+    if (user.email === OWNER_EMAIL) applyPlanUI('pro', 0, 0);
 
     editId = new URLSearchParams(window.location.search).get('edit');
     await initEditMode(user.uid);
     if (isEditMode) return;
 
-    // Show cached plan instantly while fresh data loads
-    // Skip cache when returning from payment so updated credits are fetched
     const cacheKey = `mcr_plan_${user.uid}`;
     if (returnedFromPayment) sessionStorage.removeItem(cacheKey);
     const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
     if (cached && (Date.now() - cached.ts) < 120000) {
       applyPlanUI(cached.plan, cached.listingCount, cached.credits);
+      if (user.email === OWNER_EMAIL) applyPlanUI('pro', 0, 0); // re-apply after cache
     }
 
-    try {
-      const profileData = await authFetch(`/api/users/${user.uid}`).then(r => r.json());
+    // Fetch plan with up to 3 attempts — retries handle cold-start DB delays
+    let profileData = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await authFetch(`/api/users/${user.uid}`);
+        const data = await res.json();
+        if (data.user) { profileData = data; break; }
+        throw new Error('No profile in response');
+      } catch (err) {
+        console.warn(`Plan check attempt ${attempt} failed:`, err.message);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+      }
+    }
+
+    if (profileData) {
       const profile = profileData.user;
-      if (!profile) throw new Error('Could not load profile');
+      // Owner override: always force Pro regardless of what DB says
+      if (user.email === OWNER_EMAIL) profile.plan = 'pro';
       const listingCount = profileData.listingCount || 0;
       const credits = profile.singlePostCredits || 0;
 
       sessionStorage.setItem(cacheKey, JSON.stringify({
         plan: profile.plan, listingCount, credits, ts: Date.now(),
       }));
-
       applyPlanUI(profile.plan, listingCount, credits);
-    } catch (err) {
-      console.error(err);
-      // Form is already visible by default — server enforces limits on submit
+    } else {
+      // All retries failed — owner still gets Pro, others keep form visible
+      if (user.email === OWNER_EMAIL) applyPlanUI('pro', 0, 0);
+      console.error('Plan check failed after 3 attempts — server may be starting up');
     }
   });
 
