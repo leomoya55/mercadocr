@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const dns = require('dns').promises;
 require('dotenv').config();
 
 const app = express();
@@ -89,12 +90,28 @@ const connectDB = async () => {
 };
 
 // Health check — always responds, exposes actual error message for diagnosis
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+
+  // Extract cluster hostname from MONGO_URI and test DNS resolution
+  let dnsStatus = 'no MONGO_URI';
+  const uriMatch = (process.env.MONGO_URI || '').match(/@([^/]+)/);
+  const clusterHost = uriMatch ? uriMatch[1] : null;
+  if (clusterHost) {
+    try {
+      await dns.resolve(clusterHost);
+      dnsStatus = 'resolved';
+    } catch (e) {
+      dnsStatus = 'FAILED: ' + e.message;
+    }
+  }
+
   res.json({
     server: 'ok',
     db: states[mongoose.connection.readyState] || 'unknown',
     dbError: lastDbError || null,
+    clusterHost,
+    dns: dnsStatus,
     env: {
       MONGO_URI:             !!process.env.MONGO_URI,
       STRIPE_SECRET_KEY:     !!process.env.STRIPE_SECRET_KEY,
