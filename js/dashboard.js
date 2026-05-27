@@ -11,7 +11,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const BASIC_LIMIT = 25;
 
   const loadDashboard = async (user) => {
-    const profileResponse = await authFetch(`/api/users/${user.uid}`);
+    let profileResponse = await authFetch(`/api/users/${user.uid}`);
+
+    // First-ever login: profile may not exist yet — create it then retry
+    if (profileResponse.status === 404) {
+      await authFetch('/api/users/ensure', {
+        method: 'POST',
+        body: JSON.stringify({ email: user.email }),
+      });
+      profileResponse = await authFetch(`/api/users/${user.uid}`);
+    }
+
     const profileData = await profileResponse.json();
     const profile = profileData.user;
     const listingCount = profileData.listingCount || 0;

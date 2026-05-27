@@ -31,13 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const token = await user.getIdToken();
-            await fetch(API_BASE_URL + '/api/users/ensure', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ email: user.email }),
-            });
-
+            // Redirect immediately — dashboard creates the profile if missing
             window.location.href = '/dashboard';
         } catch (error) {
             const friendlyCodes = {
