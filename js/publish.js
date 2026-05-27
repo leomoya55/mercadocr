@@ -143,10 +143,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Fetch plan with up to 3 attempts — retries handle cold-start DB delays
+    // On 404 (new user who hasn't visited dashboard yet) auto-create profile first
     let profileData = null;
+    let ensured = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const res = await authFetch(`/api/users/${user.uid}`);
+        if (res.status === 404 && !ensured) {
+          ensured = true;
+          await authFetch('/api/users/ensure', {
+            method: 'POST',
+            body: JSON.stringify({ email: user.email }),
+          });
+          // Retry immediately without counting this as a failed attempt
+          attempt--;
+          continue;
+        }
         const data = await res.json();
         if (data.user) { profileData = data; break; }
         throw new Error('No profile in response');
