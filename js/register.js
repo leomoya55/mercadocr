@@ -41,19 +41,33 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set Firebase display name if provided
             if (nombre && apellido) {
                 await user.updateProfile({ displayName: `${nombre} ${apellido}` });
+                // onAuthStateChanged already fired before updateProfile ran, so update nav directly
+                const navBtn = document.getElementById('nav-user-btn');
+                if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
             }
 
-            // Send verification email
-            await user.sendEmailVerification();
+            // Send verification email — non-blocking so a timeout/error doesn't freeze the form.
+            // The user can resend from verify-email.html if needed.
+            try {
+                await Promise.race([
+                    user.sendEmailVerification(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+                ]);
+            } catch (verifyErr) {
+                console.warn('Could not send verification email:', verifyErr.message);
+            }
 
             // Create DB profile — non-blocking: if API is unreachable, registration still succeeds.
             // Profile fields can be completed later via Settings.
             try {
                 const token = await user.getIdToken();
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 8000);
                 await fetch(API_BASE_URL + '/api/users/ensure', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ email, nombre, apellido, phone, provincia }),
+                    signal: controller.signal,
                 });
             } catch (apiErr) {
                 // API unreachable — profile will be created on first login
