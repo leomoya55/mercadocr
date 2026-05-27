@@ -54,10 +54,16 @@ router.get('/:uid', verifyToken, async (req, res) => {
   const user = await User.findOne({ firebaseUid: req.params.uid });
   if (!user) return res.status(404).json('User not found');
 
-  // Owner always has Pro — persisted on every load so it survives subscription events
-  if (isOwner(user.email) && user.plan !== 'pro') {
-    user.plan = 'pro';
-    await user.save();
+  // Owner always has Pro — force it in the response and persist async
+  if (isOwner(user.email)) {
+    if (user.plan !== 'pro') {
+      user.plan = 'pro';
+      user.save().catch(e => console.error('[owner upgrade]', e.message));
+    }
+    const userObj = user.toObject();
+    userObj.plan = 'pro';
+    const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
+    return res.json({ user: userObj, listingCount });
   }
 
   const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });

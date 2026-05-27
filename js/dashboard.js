@@ -22,7 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const profileData = await profileResponse.json();
+    console.log('[dashboard] profile response:', profileData);
     const profile = profileData.user;
+    if (!profile) throw new Error('Profile missing: ' + JSON.stringify(profileData));
     const listingCount = profileData.listingCount || 0;
 
     if (metricCount) metricCount.textContent = listingCount;
