@@ -63,37 +63,45 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../'), { extensions: ['html'] }));
 
 // Serverless-safe MongoDB connection
+let lastDbError = null;
+
 const connectDB = async () => {
   const state = mongoose.connection.readyState;
-  if (state === 1) return; // already connected
+  if (state === 1) return;
   if (state === 2) {
-    // Already connecting — wait instead of calling connect() again
     await new Promise((resolve, reject) => {
       mongoose.connection.once('connected', resolve);
       mongoose.connection.once('error', reject);
     });
     return;
   }
-  await mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 8000,
-    socketTimeoutMS: 30000,
-  });
-  console.log('MongoDB connected');
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 8000,
+      socketTimeoutMS: 30000,
+    });
+    lastDbError = null;
+    console.log('MongoDB connected');
+  } catch (err) {
+    lastDbError = err.message;
+    throw err;
+  }
 };
 
-// Health check — always responds even if DB is down (no auth, no DB required)
+// Health check — always responds, exposes actual error message for diagnosis
 app.get('/api/health', (req, res) => {
   const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
   res.json({
     server: 'ok',
     db: states[mongoose.connection.readyState] || 'unknown',
+    dbError: lastDbError || null,
     env: {
-      MONGO_URI:            !!process.env.MONGO_URI,
-      STRIPE_SECRET_KEY:    !!process.env.STRIPE_SECRET_KEY,
-      FIREBASE_PROJECT_ID:  !!process.env.FIREBASE_PROJECT_ID,
-      FIREBASE_CLIENT_EMAIL:!!process.env.FIREBASE_CLIENT_EMAIL,
-      FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
-      CLOUDINARY_CLOUD_NAME:!!process.env.CLOUDINARY_CLOUD_NAME,
+      MONGO_URI:             !!process.env.MONGO_URI,
+      STRIPE_SECRET_KEY:     !!process.env.STRIPE_SECRET_KEY,
+      FIREBASE_PROJECT_ID:   !!process.env.FIREBASE_PROJECT_ID,
+      FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
+      FIREBASE_PRIVATE_KEY:  !!process.env.FIREBASE_PRIVATE_KEY,
+      CLOUDINARY_CLOUD_NAME: !!process.env.CLOUDINARY_CLOUD_NAME,
     },
   });
 });
