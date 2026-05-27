@@ -26,7 +26,17 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://127.0.0.1:5501',
     ];
 
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+// In production (Vercel), all requests are same-origin so we allow any origin
+// that the browser presents — the vercel.json routes everything through server.js
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // same-origin / server-to-server
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (process.env.NODE_ENV === 'production' || !process.env.ALLOWED_ORIGINS) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

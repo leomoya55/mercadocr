@@ -23,8 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const profileData = await profileResponse.json();
     const profile = profileData.user || {};
-    // Owner override: Firebase user.email is the authoritative source
-    if (user.email === 'leomoyawr300@gmail.com') profile.plan = 'pro';
+    if (user.email === OWNER_EMAIL) profile.plan = 'pro';
     const listingCount = profileData.listingCount || 0;
 
     if (metricCount) metricCount.textContent = listingCount;
@@ -139,14 +138,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  const OWNER_EMAIL = 'leomoyawr300@gmail.com';
+
+  function applyOwnerUI() {
+    if (metricPlan) metricPlan.textContent = 'Pro';
+    if (metricFree) metricFree.textContent = 'Ilimitadas';
+    if (upgradeSection) upgradeSection.classList.add('hidden');
+  }
+
   auth.onAuthStateChanged((user) => {
     if (!user) {
       window.location.href = '/login';
       return;
     }
+    // Set owner plan display immediately — no API call needed, no async delay
+    if (user.email === OWNER_EMAIL) applyOwnerUI();
+
     loadDashboard(user).catch(err => {
       console.error(err);
-      if (listingsContainer) listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. Recarga la página.</p>';
+      // Re-apply owner UI in case the error path reset something
+      if (user.email === OWNER_EMAIL) applyOwnerUI();
+      else if (listingsContainer) listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. Recarga la página.</p>';
     });
   });
 
