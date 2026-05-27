@@ -14,7 +14,6 @@ const requiredEnv = ['MONGO_URI', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
 const missing = requiredEnv.filter(k => !process.env[k]);
 if (missing.length > 0) {
   console.error('MISSING ENV VARS:', missing.join(', '));
-  if (process.env.NODE_ENV === 'production') process.exit(1);
 }
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
