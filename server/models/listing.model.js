@@ -8,8 +8,8 @@ const listingSchema = new Schema({
     price: { type: Number, required: true },
     category: { type: String, required: true },
     photos: [{ type: String, required: true }],
-    contact: { type: String, required: true },
-    provincia: { type: String, required: true },
+    contact: { type: String, default: '' },
+    provincia: { type: String, default: '' },
     author: { type: String, required: true }, // Firebase UID
     featured: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'sold'], default: 'active' },

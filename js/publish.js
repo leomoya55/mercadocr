@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const proButton    = document.getElementById('pro-button');
 
   const FREE_LIMIT  = 3;
-  const BASIC_LIMIT = 25;
+  const BASIC_LIMIT = 20;
 
   const startCheckout = async (type, btn) => {
     const user = auth.currentUser;
@@ -62,8 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (plan === 'pro') {
       subtitle.textContent = 'Tu plan Pro te da publicaciones ilimitadas con destacado automático en todos tus anuncios.';
     } else if (plan === 'basic') {
-      const remaining = Math.max(0, 25 - listingCount);
-      subtitle.textContent = `Tu plan Basic incluye hasta 25 anuncios activos. Te quedan ${remaining} publicación${remaining !== 1 ? 'es' : ''} disponible${remaining !== 1 ? 's' : ''}.`;
+      const remaining = Math.max(0, BASIC_LIMIT - listingCount);
+      subtitle.textContent = `Tu plan Basic incluye hasta ${BASIC_LIMIT} anuncios activos. Te quedan ${remaining} publicación${remaining !== 1 ? 'es' : ''} disponible${remaining !== 1 ? 's' : ''}.`;
     } else {
       const remaining = Math.max(0, 3 - listingCount);
       if (remaining > 0) {

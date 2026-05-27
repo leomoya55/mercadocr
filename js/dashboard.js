@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const upgradeButton = document.getElementById('upgrade-pro');
 
   const FREE_LIMIT  = 3;
-  const BASIC_LIMIT = 25;
+  const BASIC_LIMIT = 20;
 
   const loadDashboard = async (user) => {
     let profileResponse = await authFetch(`/api/users/${user.uid}`);

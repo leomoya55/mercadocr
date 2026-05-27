@@ -5,7 +5,7 @@ const upload = require('../config/cloudinary');
 const { verifyToken } = require('../middleware/auth');
 
 const FREE_LIMIT  = 3;
-const BASIC_LIMIT = 25;
+const BASIC_LIMIT = 20;
 
 // Get all active listings — public
 router.get('/', (req, res) => {
@@ -19,15 +19,18 @@ router.get('/', (req, res) => {
 router.post('/add', verifyToken, upload.array('photos'), async (req, res) => {
   try {
     const uid = req.uid;
-    const { name, description, price, category, contact, provincia } = req.body;
+    const { name, description, price, category } = req.body;
     if (!req.files || req.files.length === 0) {
       return res.status(400).json('At least one photo is required');
     }
-    if (!provincia) return res.status(400).json('Provincia is required');
 
     const photos = req.files.map(file => file.path);
     const user = await User.findOne({ firebaseUid: uid });
     if (!user) return res.status(404).json('User not found');
+
+    // Pull provincia and contact from the user's profile
+    const provincia = user.provincia || '';
+    const contact   = user.phone    || user.email || '';
 
     // Count only active (non-sold) listings for limit checks
     const activeCount = await Listing.countDocuments({ author: uid, status: { $ne: 'sold' } });
@@ -87,17 +90,24 @@ router.get('/:id', async (req, res) => {
 router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res) => {
   try {
     const uid = req.uid;
-    const { name, description, price, category, contact, provincia } = req.body;
+    const { name, description, price, category } = req.body;
     const listing = await Listing.findById(req.params.id);
     if (!listing) return res.status(404).json('Listing not found');
     if (listing.author !== uid) return res.status(403).json('Not authorized');
+
+    // Keep provincia/contact from profile if listing doesn't have them yet
+    if (!listing.provincia || !listing.contact) {
+      const user = await User.findOne({ firebaseUid: uid });
+      if (user) {
+        if (!listing.provincia) listing.provincia = user.provincia || '';
+        if (!listing.contact)   listing.contact   = user.phone || user.email || '';
+      }
+    }
 
     listing.name = name;
     listing.description = description;
     listing.price = price;
     listing.category = category;
-    listing.contact = contact;
-    if (provincia) listing.provincia = provincia;
     if (req.files && req.files.length > 0) {
       listing.photos = req.files.map(file => file.path);
     }

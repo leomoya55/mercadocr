@@ -62,9 +62,30 @@ app.use((req, res, next) => {
 // Serve static frontend from project root
 app.use(express.static(path.join(__dirname, '../'), { extensions: ['html'] }));
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+// Serverless-safe MongoDB connection: reuse across warm invocations,
+// re-establish on cold starts, and block API requests until ready.
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) return; // already connected
+  await mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  });
+  console.log('MongoDB connected');
+};
+
+// Best-effort connect at startup
+connectDB().catch(err => console.error('Initial DB connect error:', err.message));
+
+// Ensure DB is ready before every API call (handles cold starts)
+app.use('/api/', async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('DB connect error:', err.message);
+    res.status(503).json({ error: 'Base de datos no disponible. Intenta de nuevo en unos segundos.' });
+  }
+});
 
 app.use('/api/listings', require('./routes/listings'));
 app.use('/api/payment', require('./routes/payment'));
