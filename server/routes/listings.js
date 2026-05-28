@@ -25,8 +25,16 @@ router.post('/add', verifyToken, upload.array('photos'), async (req, res) => {
     }
 
     const photos = req.files.map(file => file.path);
-    const user = await User.findOne({ firebaseUid: uid });
-    if (!user) return res.status(404).json('User not found');
+    let user = await User.findOne({ firebaseUid: uid });
+
+    // Profile doesn't exist yet — create it on the fly so publishing never hard-fails
+    if (!user) {
+      user = await User.create({
+        firebaseUid: uid,
+        email: req.email || '',
+        plan: 'free',
+      });
+    }
 
     // Pull provincia and contact from the user's profile
     const provincia = user.provincia || '';
