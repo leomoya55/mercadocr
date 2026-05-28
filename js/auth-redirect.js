@@ -26,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
         auth.signOut().then(() => { window.location.href = '/'; });
     });
 
+    const OWNER_EMAIL = 'leomoyawr300@gmail.com';
+
     // Show/hide nav items based on auth state
     auth.onAuthStateChanged(user => {
         document.querySelectorAll('[data-auth-only]').forEach(el => {
@@ -33,6 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.querySelectorAll('[data-guest-only]').forEach(el => {
             el.classList.toggle('nav-hidden', !!user);
+        });
+
+        // Admin link — only visible to the owner account
+        document.querySelectorAll('[data-admin-only]').forEach(el => {
+            el.classList.toggle('nav-hidden', !user || user.email !== OWNER_EMAIL);
         });
 
         if (user) {

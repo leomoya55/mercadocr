@@ -210,6 +210,31 @@ async function runStartupMigrations() {
     if (deleted.deletedCount > 0) {
       console.log(`[migration] Deleted ${deleted.deletedCount} corrupted user doc(s) (null/missing firebaseUid)`);
     }
+
+    // 4. Clear auto-featured listings (one-time, tracked so it never re-runs).
+    //
+    //    Old versions of the code set featured:true automatically for Pro plan
+    //    users. That logic was removed — featured is now a manual admin action
+    //    only (POST /api/admin/listings/:id/feature).
+    //
+    //    We track completion in a _migrations collection so this step is skipped
+    //    on subsequent cold starts and never touches listings the admin
+    //    intentionally features via the admin panel in the future.
+    const migrationsCol = mongoose.connection.collection('_migrations');
+    const alreadyRan = await migrationsCol.findOne({ name: 'clear_auto_featured_v1' });
+    if (!alreadyRan) {
+      const listingsCol = mongoose.connection.collection('listings');
+      const cleared = await listingsCol.updateMany(
+        { featured: true },
+        { $set: { featured: false } }
+      );
+      await migrationsCol.insertOne({ name: 'clear_auto_featured_v1', ranAt: new Date() });
+      if (cleared.modifiedCount > 0) {
+        console.log(`[migration] Cleared featured flag on ${cleared.modifiedCount} listing(s) (auto-featured cleanup)`);
+      } else {
+        console.log('[migration] clear_auto_featured_v1: no listings to clear');
+      }
+    }
   } catch (err) {
     // Never let a migration error prevent the server from starting
     console.error('[migration] Startup migration error:', err.message);
