@@ -70,7 +70,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    const [listings, total] = await Promise.all([
+    let [listings, total] = await Promise.all([
       Listing.find(filter, q && q.trim() ? { score: { $meta: 'textScore' } } : {})
         .sort(sortObj)
         .skip(skip)
@@ -78,6 +78,33 @@ router.get('/', async (req, res) => {
         .lean(),
       Listing.countDocuments(filter),
     ]);
+
+    // ── Fill in missing contact/provincia from the seller's current profile ───
+    // Listings created before the registration fix may have contact='' or
+    // provincia=''. One batch User lookup covers all authors on this page —
+    // no N+1 queries. We never overwrite a field that already has a value.
+    const missingContact  = listings.some(l => !l.contact);
+    const missingProvincia = listings.some(l => !l.provincia);
+
+    if (missingContact || missingProvincia) {
+      const authorUids = [...new Set(listings.map(l => l.author))];
+      const sellers = await User
+        .find({ firebaseUid: { $in: authorUids } })
+        .select('firebaseUid phone provincia')
+        .lean();
+      const sellerMap = {};
+      sellers.forEach(s => { sellerMap[s.firebaseUid] = s; });
+
+      listings = listings.map(l => {
+        const s = sellerMap[l.author];
+        if (!s) return l;
+        return {
+          ...l,
+          contact:   l.contact   || s.phone     || '',
+          provincia: l.provincia || s.provincia  || '',
+        };
+      });
+    }
 
     res.json({
       listings,
