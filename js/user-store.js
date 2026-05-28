@@ -56,8 +56,10 @@
     let reg;
     try { reg = JSON.parse(raw); } catch { return data; }
 
-    // Only send if the profile is still missing key registration fields
-    if (data.user.nombre && data.user.phone) return data;
+    // Only send if at least one key registration field is still blank.
+    // Checks nombre, phone, AND provincia so a user who had no provincia
+    // also gets the forward.
+    if (data.user.nombre && data.user.phone && data.user.provincia) return data;
 
     try {
       await authFetch('/api/users/me/profile', {

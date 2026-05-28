@@ -69,10 +69,31 @@ document.addEventListener('DOMContentLoaded', () => {
             // Send verification email — fire and forget, doesn't block redirect
             user.sendEmailVerification().catch(e => console.warn('Verification email:', e.message));
 
-            // ── Step 3: Persist registration data for the next page load ──────
-            // UserStore.getProfile() reads this on the first authenticated request
-            // (dashboard/publish/settings) and forwards it to PUT /api/users/me/profile,
-            // saving nombre, apellido, phone, and provincia permanently.
+            // ── Step 3: Persist registration data immediately to the server ─────
+            //
+            // We call /api/users/ensure right now, while we still have the form data
+            // and a fresh ID token. This avoids the sessionStorage cross-tab problem:
+            // email clients open the verification link in a NEW tab, which has its own
+            // (empty) sessionStorage — the mcr_reg backup never arrives.
+            submitButton.textContent = 'Guardando perfil...';
+            try {
+                const token = await user.getIdToken();
+                await fetch(API_BASE_URL + '/api/users/ensure', {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': 'Bearer ' + token,
+                    },
+                    body: JSON.stringify({ nombre, apellido, phone, provincia, email }),
+                });
+            } catch (persistErr) {
+                // Network failure during registration — keep mcr_reg as a backup.
+                // UserStore.getProfile() will forward it on the first authenticated page load.
+                console.warn('[register] immediate profile persist failed:', persistErr.message);
+            }
+
+            // mcr_reg backup: forwarded by UserStore.getProfile() if the /ensure
+            // call above failed (e.g. server was cold-starting).
             sessionStorage.setItem('mcr_reg', JSON.stringify({ phone, provincia, nombre, apellido }));
 
             sessionStorage.setItem('verificationEmail', email);

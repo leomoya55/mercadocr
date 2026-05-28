@@ -64,6 +64,7 @@ router.get('/me', verifyToken, ensureUser, async (req, res) => {
  * PUT /me/profile
  * Update nombre, apellido, phone, provincia.
  * Enforces phone uniqueness across all accounts.
+ * Also back-fills the seller's active listings so contact/provincia stay in sync.
  */
 router.put('/me/profile', verifyToken, ensureUser, async (req, res) => {
   try {
@@ -90,6 +91,25 @@ router.put('/me/profile', verifyToken, ensureUser, async (req, res) => {
       { $set: set },
       { new: true }
     );
+
+    // ── Back-fill active listings that still have empty contact/provincia ──
+    // Runs fire-and-forget so it never blocks the settings save response.
+    // Only touches listings where the field is currently blank — never overwrites
+    // a non-empty value (respects any per-listing overrides set elsewhere).
+    const listingSync = {};
+    if (cleanPhone) listingSync.contact  = cleanPhone;
+    if (provincia)  listingSync.provincia = provincia;
+
+    if (Object.keys(listingSync).length) {
+      const orClauses = [];
+      if (cleanPhone) orClauses.push({ contact:  { $in: ['', null] } });
+      if (provincia)  orClauses.push({ provincia: { $in: ['', null] } });
+
+      Listing.updateMany(
+        { author: uid, status: { $ne: 'sold' }, $or: orClauses },
+        { $set: listingSync }
+      ).catch(e => console.warn('[PUT /me/profile] listing sync failed:', e.message));
+    }
 
     res.json({ user: updated });
   } catch (err) {
@@ -176,7 +196,7 @@ router.get('/:uid', verifyToken, ensureUser, async (req, res) => {
   }
 });
 
-// PUT /:uid/profile — same logic as /me/profile
+// PUT /:uid/profile — same logic as /me/profile (legacy route)
 router.put('/:uid/profile', verifyToken, ensureUser, async (req, res) => {
   try {
     if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
@@ -203,6 +223,22 @@ router.put('/:uid/profile', verifyToken, ensureUser, async (req, res) => {
       { $set: set },
       { new: true }
     );
+
+    // Back-fill active listings with empty contact/provincia (same as /me/profile)
+    const listingSync = {};
+    if (cleanPhone) listingSync.contact  = cleanPhone;
+    if (provincia)  listingSync.provincia = provincia;
+
+    if (Object.keys(listingSync).length) {
+      const orClauses = [];
+      if (cleanPhone) orClauses.push({ contact:  { $in: ['', null] } });
+      if (provincia)  orClauses.push({ provincia: { $in: ['', null] } });
+
+      Listing.updateMany(
+        { author: uid, status: { $ne: 'sold' }, $or: orClauses },
+        { $set: listingSync }
+      ).catch(e => console.warn('[PUT /:uid/profile] listing sync failed:', e.message));
+    }
 
     res.json({ user: updated });
   } catch (err) {
