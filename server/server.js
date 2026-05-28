@@ -1,13 +1,27 @@
-const express = require('express');
+const express  = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const cors     = require('cors');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
-const dns = require('dns').promises;
+const path     = require('path');
+const fs       = require('fs');
+const dns      = require('dns').promises;
 require('dotenv').config();
 
-const app = express();
+// Optional security dependencies — skip gracefully if not yet installed
+let helmet, mongoSanitize;
+try { helmet       = require('helmet');                  } catch { /* not installed yet */ }
+try { mongoSanitize = require('express-mongo-sanitize'); } catch { /* not installed yet */ }
+
+const app  = express();
 const port = process.env.PORT || 5000;
+
+// ─── Security headers ─────────────────────────────────────────────────────────
+if (helmet) {
+  app.use(helmet({
+    contentSecurityPolicy: false, // Configured separately if needed
+    crossOriginEmbedderPolicy: false,
+  }));
+}
 
 const requiredEnv = ['MONGO_URI', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
   'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
@@ -50,6 +64,31 @@ app.use('/api/', apiLimiter);
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
+// ─── NoSQL injection protection ───────────────────────────────────────────────
+// Strips keys that start with '$' or contain '.' from req.body/params/query.
+if (mongoSanitize) {
+  app.use(mongoSanitize());
+}
+
+// ─── Structured request logger ────────────────────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    if (req.path.startsWith('/api/') || res.statusCode >= 400) {
+      console.log(JSON.stringify({
+        ts:     new Date().toISOString(),
+        method: req.method,
+        path:   req.path,
+        status: res.statusCode,
+        ms,
+        uid:    req.uid || null,
+      }));
+    }
+  });
+  next();
+});
+
 // Redirect .html URLs to clean paths (preserve query string)
 app.use((req, res, next) => {
   if (req.path.endsWith('.html')) {
@@ -58,6 +97,61 @@ app.use((req, res, next) => {
     return res.redirect(301, clean + req.url.slice(req.path.length));
   }
   next();
+});
+
+// ─── OG / SEO meta-tag injection for product pages ───────────────────────────
+//
+// Must come BEFORE express.static so dynamic meta overrides the static file.
+// Only handles GET /product?id=… — all other routes continue to static.
+//
+// Pattern: read product.html, patch <title> and <meta> tags, stream response.
+// No server-side render framework needed — simple string replacement.
+//
+app.get('/product', async (req, res, next) => {
+  const id = req.query.id;
+  if (!id) return next(); // no id → fall through to static (will 404 gracefully)
+
+  try {
+    await connectDB();
+    const Listing = require('./models/listing.model');
+    const listing  = await Listing.findById(id).lean();
+    if (!listing || listing.hidden) return next();
+
+    const htmlPath = path.join(__dirname, '../product.html');
+    let html = fs.readFileSync(htmlPath, 'utf8');
+
+    const name   = listing.name        || 'Anuncio';
+    const desc   = listing.description || 'Ver anuncio en MercadoCR';
+    const price  = '₡' + Number(listing.price).toLocaleString('es-CR');
+    const photo  = listing.photos && listing.photos[0] ? listing.photos[0] : '';
+    const title  = `${name} — ${price} | MercadoCR`;
+    const descSafe = desc.replace(/"/g, '&quot;').slice(0, 200);
+    const nameSafe = name.replace(/"/g, '&quot;');
+
+    html = html
+      .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+      .replace(
+        '</head>',
+        `  <meta name="description" content="${descSafe}">\n` +
+        `  <meta property="og:title" content="${nameSafe}">\n` +
+        `  <meta property="og:description" content="${descSafe}">\n` +
+        `  <meta property="og:type" content="product">\n` +
+        (photo ? `  <meta property="og:image" content="${photo}">\n` : '') +
+        `  <meta property="og:site_name" content="MercadoCR">\n` +
+        `  <meta name="twitter:card" content="summary_large_image">\n` +
+        `  <meta name="twitter:title" content="${nameSafe}">\n` +
+        `  <meta name="twitter:description" content="${descSafe}">\n` +
+        (photo ? `  <meta name="twitter:image" content="${photo}">\n` : '') +
+        '</head>'
+      );
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=60'); // 1-min cache
+    res.send(html);
+  } catch (err) {
+    console.error('[OG inject]', err.message);
+    next(); // fall through to static on any error
+  }
 });
 
 // Serve static frontend from project root
@@ -208,8 +302,10 @@ app.use('/api/', async (req, res, next) => {
 });
 
 app.use('/api/listings', require('./routes/listings'));
-app.use('/api/payment', require('./routes/payment'));
-app.use('/api/users', require('./routes/users'));
+app.use('/api/payment',  require('./routes/payment'));
+app.use('/api/users',    require('./routes/users'));
+app.use('/api/reports',  require('./routes/reports'));
+app.use('/api/admin',    require('./routes/admin'));
 
 if (require.main === module) {
   app.listen(port, () => console.log(`Server running on port ${port}`));

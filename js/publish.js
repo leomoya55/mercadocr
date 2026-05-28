@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cached = UserStore.current;
     if (type !== 'single' && cached?.user?.plan === type) {
       const label = type === 'pro' ? 'Pro' : 'Basic';
-      alert(`¡Ya tienes el plan ${label} activo! No necesitas volver a comprarlo.`);
+      Toast.info(`¡Ya tienes el plan ${label} activo! No necesitas volver a comprarlo.`);
       return;
     }
 
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
 
       if (response.status === 400 && data.error === 'already_on_plan') {
-        alert(data.message || '¡Ya tienes este plan activo!');
+        Toast.info(data.message || '¡Ya tienes este plan activo!');
         btn.disabled = false;
         btn.textContent = originalText;
         return;
@@ -88,20 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hint) hint.classList.toggle('hidden', plan === 'pro');
   }
 
-  /**
-   * Build the subtitle text from server-computed values.
-   * Frontend never computes limits — it uses what the API returned.
-   *
-   * @param {string}      plan
-   * @param {number}      listingCount
-   * @param {number|null} remaining    — null = unlimited (Pro)
-   * @param {number}      maxListings  — null = unlimited
-   * @param {number}      credits
-   */
   function setSubtitle(plan, listingCount, remaining, maxListings, credits) {
     if (!subtitle) return;
     if (plan === 'pro' || remaining === null) {
-      subtitle.textContent = 'Tu plan Pro te da publicaciones ilimitadas con destacado automático en todos tus anuncios.';
+      subtitle.textContent = 'Tu plan Pro te da publicaciones ilimitadas.';
     } else if (remaining > 0) {
       subtitle.textContent = `Plan ${plan === 'basic' ? 'Basic' : 'gratuito'} · ${remaining} de ${maxListings} anuncio${maxListings !== 1 ? 's' : ''} disponible${remaining !== 1 ? 's' : ''}.`;
     } else if (credits > 0) {
@@ -127,13 +117,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // ─── Edit mode ────────────────────────────────────────────────────────────
+
   const initEditMode = async (uid) => {
     if (!editId) return;
     const response = await fetch(API_BASE_URL + `/api/listings/${editId}`);
     const listing  = await response.json();
     if (!listing || listing.author !== uid) {
-      alert('No tienes permisos para editar este anuncio.');
-      window.location.href = '/dashboard';
+      Toast.error('No tienes permisos para editar este anuncio.');
+      setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
       return;
     }
     isEditMode = true;
@@ -141,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     form.description.value = listing.description;
     form.price.value       = listing.price;
     form.category.value    = listing.category;
+    if (form.condition) form.condition.value = listing.condition || '';
     submitButton.textContent = 'Guardar cambios';
     showForm();
   };
@@ -170,8 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (profileData) {
       const profile      = profileData.user;
       const listingCount = profileData.listingCount || 0;
-      const remaining    = profileData.remaining;      // server-computed
-      const maxListings  = profileData.maxListings;    // server-computed
+      const remaining    = profileData.remaining;
+      const maxListings  = profileData.maxListings;
       const credits      = profileData.credits || 0;
       applyPlanUI(profile.plan, listingCount, remaining, maxListings, credits);
     } else {
@@ -184,12 +177,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (!currentUser) { alert('Debes iniciar sesión para publicar.'); return; }
+      if (!currentUser) {
+        Toast.error('Debes iniciar sesión para publicar.');
+        return;
+      }
 
       submitButton.disabled = true;
       submitButton.textContent = 'Publicando...';
 
       const formData = new FormData(form);
+      const listingName = formData.get('name') || '';
 
       try {
         const endpoint = isEditMode
@@ -200,8 +197,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (response.ok) {
           UserStore.invalidate();
-          alert(isEditMode ? 'Anuncio actualizado con éxito.' : '¡Anuncio publicado con éxito!');
-          window.location.href = '/dashboard';
+
+          if (isEditMode) {
+            // Edit: toast + redirect back to dashboard
+            Toast.success('Anuncio actualizado con éxito.');
+            setTimeout(() => { window.location.href = '/dashboard'; }, 1800);
+          } else {
+            // New listing: show success modal with thumbnail + action buttons
+            const data = await response.json().catch(() => ({}));
+            showPublishSuccess({
+              id:    data.id    ? String(data.id) : '',
+              name:  data.name  || listingName,
+              photo: data.photo || '',
+            });
+            // Reset the form so "Publish another" starts fresh
+            form.reset();
+          }
 
         } else if (response.status === 402) {
           // Backend enforced the limit — parse structured error for better prompt
@@ -215,15 +226,16 @@ document.addEventListener('DOMContentLoaded', () => {
           showPayments();
 
         } else {
-          const errorData = await response.text();
-          alert('Error al publicar: ' + errorData);
+          const errorText = await response.text().catch(() => String(response.status));
+          Toast.error('Error al publicar. Por favor intenta de nuevo.');
+          console.error('[publish] server error:', errorText);
         }
       } catch (error) {
-        console.error('Error:', error);
-        alert('Ocurrió un error al publicar.');
+        console.error('[publish] network error:', error);
+        Toast.error('No se pudo conectar con el servidor. Intenta de nuevo.');
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Publicar';
+        submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
       }
     });
   }

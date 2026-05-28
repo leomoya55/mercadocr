@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — MercadoCR</title>
+    <!-- No robots indexing for the admin panel -->
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">MercadoCR <span class="admin-badge">Admin</span></div>
+            <ul>
+                <li><a href="/">Inicio</a></li>
+                <li><a href="/listings">Anuncios</a></li>
+                <li><button class="nav-logout-btn" id="nav-logout" type="button">Salir</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="admin-page">
+        <div id="admin-guard" class="admin-guard hidden">
+            <p>Acceso denegado.</p>
+        </div>
+
+        <div id="admin-content" class="hidden">
+            <h2>Panel de administración</h2>
+
+            <!-- Stats row -->
+            <section class="admin-stats" id="admin-stats">
+                <div class="stat-card"><div class="stat-val" id="stat-listings-active">—</div><div class="stat-label">Anuncios activos</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-listings-hidden">—</div><div class="stat-label">Anuncios ocultos</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-users-total">—</div><div class="stat-label">Usuarios</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-users-pro">—</div><div class="stat-label">Usuarios Pro</div></div>
+                <div class="stat-card"><div class="stat-val" id="stat-reports-pending">—</div><div class="stat-label">Reportes pendientes</div></div>
+            </section>
+
+            <!-- Tabs -->
+            <nav class="admin-tabs" id="admin-tabs">
+                <button class="admin-tab active" data-tab="listings">Anuncios</button>
+                <button class="admin-tab" data-tab="users">Usuarios</button>
+                <button class="admin-tab" data-tab="reports">Reportes</button>
+            </nav>
+
+            <!-- Listings panel -->
+            <section class="admin-panel active" id="tab-listings">
+                <div class="admin-toolbar">
+                    <input type="search" id="admin-listing-q" placeholder="Buscar por nombre...">
+                    <select id="admin-listing-status">
+                        <option value="">Todos los estados</option>
+                        <option value="active">Activos</option>
+                        <option value="sold">Vendidos</option>
+                    </select>
+                    <select id="admin-listing-hidden">
+                        <option value="">Todos</option>
+                        <option value="false">Visibles</option>
+                        <option value="true">Ocultos</option>
+                    </select>
+                    <button id="admin-listing-search" type="button">Buscar</button>
+                </div>
+                <div id="admin-listings-table" class="admin-table-wrap">
+                    <p class="admin-loading">Cargando...</p>
+                </div>
+                <div class="admin-pagination" id="admin-listings-pages"></div>
+            </section>
+
+            <!-- Users panel -->
+            <section class="admin-panel" id="tab-users">
+                <div id="admin-users-table" class="admin-table-wrap">
+                    <p class="admin-loading">Cargando...</p>
+                </div>
+                <div class="admin-pagination" id="admin-users-pages"></div>
+            </section>
+
+            <!-- Reports panel -->
+            <section class="admin-panel" id="tab-reports">
+                <div class="admin-toolbar">
+                    <select id="admin-report-status">
+                        <option value="pending">Pendientes</option>
+                        <option value="reviewed">Revisados</option>
+                        <option value="dismissed">Descartados</option>
+                        <option value="actioned">Con acción</option>
+                        <option value="">Todos</option>
+                    </select>
+                    <button id="admin-report-search" type="button">Filtrar</button>
+                </div>
+                <div id="admin-reports-table" class="admin-table-wrap">
+                    <p class="admin-loading">Cargando...</p>
+                </div>
+                <div class="admin-pagination" id="admin-reports-pages"></div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 MercadoCR. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/config.js?v=12"></script>
+    <script src="js/ui.js?v=12"></script>
+    <script src="js/auth-redirect.js?v=12"></script>
+    <script src="js/admin.js?v=12"></script>
+</body>
+</html>

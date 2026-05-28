@@ -9,10 +9,12 @@ const OWNER_EMAIL = (process.env.FOUNDER_EMAIL || 'leomoyawr300@gmail.com').toLo
  * Plan definitions.
  * maxListings: Infinity means the backend never rejects on count alone.
  */
+// featured is NOT a plan property — it is a standalone paid promotion (see config/featured.js).
+// Plans only govern listing quantity limits and display labels.
 const PLANS = {
-  free:  { maxListings: 3,        label: 'Gratis', featured: false },
-  basic: { maxListings: 25,       label: 'Basic',  featured: false },
-  pro:   { maxListings: Infinity, label: 'Pro',    featured: true  },
+  free:  { maxListings: 3,        label: 'Gratis' },
+  basic: { maxListings: 25,       label: 'Basic'  },
+  pro:   { maxListings: Infinity, label: 'Pro'    },
 };
 
 /**

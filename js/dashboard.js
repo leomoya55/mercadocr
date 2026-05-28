@@ -214,8 +214,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (metricFree)        metricFree.textContent  = '3';
         if (metricPlan)        metricPlan.textContent  = 'Gratis';
         if (metricCount)       metricCount.textContent = '0';
-        if (listingsContainer) listingsContainer.innerHTML =
-          '<p class="dashboard-empty">Error al cargar el panel. <a href="" onclick="location.reload();return false;">Recarga la página →</a></p>';
+        if (listingsContainer) {
+          listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. <a href="" id="dashboard-reload-link">Recarga la página →</a></p>';
+          const reloadLink = listingsContainer.querySelector('#dashboard-reload-link');
+          if (reloadLink) reloadLink.addEventListener('click', (e) => { e.preventDefault(); location.reload(); });
+        }
       }
     });
   });
@@ -228,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Friendly guard: don't start checkout if already Pro
       const cached = UserStore.current;
       if (cached?.user?.plan === 'pro') {
-        alert('¡Ya tienes el plan Pro activo! No necesitas volver a comprarlo.');
+        Toast.info('¡Ya tienes el plan Pro activo! No necesitas volver a comprarlo.');
         return;
       }
 
@@ -242,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await response.json();
 
         if (response.status === 400 && data.error === 'already_on_plan') {
-          alert(data.message || '¡Ya tienes el plan Pro activo!');
+          Toast.info(data.message || '¡Ya tienes el plan Pro activo!');
           upgradeButton.disabled = false;
           upgradeButton.textContent = 'Hacerme Pro';
           return;
@@ -251,13 +254,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.url) {
           window.location.href = data.url;
         } else {
-          alert('Error al iniciar el pago.');
+          Toast.error('Error al iniciar el pago. Intenta de nuevo.');
           upgradeButton.disabled = false;
           upgradeButton.textContent = 'Hacerme Pro';
         }
       } catch (error) {
         console.error('Error:', error);
-        alert('No se pudo conectar con el servidor.');
+        Toast.error('No se pudo conectar con el servidor.');
         upgradeButton.disabled = false;
         upgradeButton.textContent = 'Hacerme Pro';
       }

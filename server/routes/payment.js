@@ -52,7 +52,7 @@ router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res
       product_data: {
         name: isPro ? 'Suscripcion Pro MercadoCR' : 'Suscripcion Basic MercadoCR',
         description: isPro
-          ? 'Plan Pro mensual con anuncios ilimitados y destacados.'
+          ? 'Plan Pro mensual con publicaciones ilimitadas.'
           : 'Plan Basic mensual con hasta 25 anuncios activos.',
       },
       unit_amount: isPro ? 1000000 : 500000,
@@ -110,21 +110,17 @@ router.post('/webhook', async (req, res) => {
         { plan, planExpiresAt, stripeCustomerId: subscription.customer, stripeSubscriptionId: subscription.id },
         { new: true }
       );
-      if (plan === 'pro') {
-        const Listing = require('../models/listing.model');
-        await Listing.updateMany({ author: uid }, { featured: true });
-      }
+      // featured is a manual setting — not auto-toggled on plan change
     }
     if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object;
       const uid = subscription.metadata.uid;
-      const Listing = require('../models/listing.model');
       await User.findOneAndUpdate(
         { firebaseUid: uid },
         { plan: 'free', planExpiresAt: null, stripeSubscriptionId: null },
         { new: true }
       );
-      await Listing.updateMany({ author: uid }, { featured: false });
+      // featured is a manual setting — not auto-toggled on plan change
     }
     if (event.type === 'invoice.payment_failed') {
       console.error('Payment failed for subscription:', event.data.object.subscription);
@@ -155,9 +151,7 @@ router.post('/cancel-subscription', verifyToken, async (req, res) => {
       { firebaseUid: uid },
       { $set: { plan: 'free', stripeSubscriptionId: null, planExpiresAt: null } }
     );
-
-    const Listing = require('../models/listing.model');
-    await Listing.updateMany({ author: uid }, { featured: false });
+    // featured is a manual setting — not auto-toggled on cancellation
 
     res.json({ success: true });
   } catch (error) {

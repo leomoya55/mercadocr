@@ -230,9 +230,8 @@ router.put('/:uid/plan', verifyToken, async (req, res) => {
     );
     if (!updated) return res.status(404).json('User not found');
 
-    if (updated.plan === 'pro') {
-      await Listing.updateMany({ author: req.params.uid }, { featured: true });
-    }
+    // featured is a standalone paid promotion — never auto-toggled on plan change.
+    // See server/config/featured.js for the featured architecture roadmap.
     res.json({ user: updated });
   } catch (err) {
     console.error('[PUT /:uid/plan]', err.message);

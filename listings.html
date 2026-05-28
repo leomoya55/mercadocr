@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anuncios - MercadoCR</title>
+    <meta name="description" content="Encuentra los mejores anuncios de Costa Rica en MercadoCR. Ropa, electrónica, vehículos, hogar y más.">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/listings.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -47,14 +48,50 @@
         </aside>
         <section class="listings-page">
             <h2>Todos los anuncios</h2>
+
+            <div class="search-bar">
+                <input type="search" id="search-q" placeholder="Buscar anuncios..." autocomplete="off">
+                <button id="search-btn" type="button">Buscar</button>
+            </div>
+
             <div class="filters">
-                <input type="number" id="min-price" placeholder="Precio mín.">
-                <input type="number" id="max-price" placeholder="Precio máx.">
-                <button id="filter-button">Filtrar</button>
+                <select id="filter-condition">
+                    <option value="">Cualquier estado</option>
+                    <option value="new">Nuevo</option>
+                    <option value="like_new">Como nuevo</option>
+                    <option value="good">Buen estado</option>
+                    <option value="fair">Estado regular</option>
+                    <option value="regular">Para reparar</option>
+                </select>
+                <select id="filter-provincia">
+                    <option value="">Cualquier provincia</option>
+                    <option>San José</option>
+                    <option>Alajuela</option>
+                    <option>Cartago</option>
+                    <option>Heredia</option>
+                    <option>Guanacaste</option>
+                    <option>Puntarenas</option>
+                    <option>Limón</option>
+                </select>
+                <input type="number" id="min-price" placeholder="Precio mín." min="0">
+                <input type="number" id="max-price" placeholder="Precio máx." min="0">
+                <select id="filter-sort">
+                    <option value="newest">Más recientes</option>
+                    <option value="featured">Destacados primero</option>
+                    <option value="price_asc">Precio: menor a mayor</option>
+                    <option value="price_desc">Precio: mayor a menor</option>
+                </select>
+                <button id="filter-button" type="button">Aplicar</button>
+                <button id="reset-button" type="button" class="btn-secondary">Limpiar</button>
             </div>
-            <div class="listings-grid" id="listings-container">
-                <!-- Listings will be dynamically loaded here -->
+
+            <div id="listings-count" class="listings-count" aria-live="polite"></div>
+
+            <div class="listings-grid" id="listings-container" aria-live="polite">
+                <!-- Listings loaded dynamically -->
             </div>
+
+            <div class="listings-pagination" id="listings-pagination"></div>
         </section>
     </main>
 
@@ -65,8 +102,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
     <script src="js/firebase-config.js"></script>
-    <script src="js/config.js"></script>
-    <script src="js/auth-redirect.js"></script>
-    <script src="js/listings.js"></script>
+    <script src="js/config.js?v=12"></script>
+    <script src="js/ui.js?v=12"></script>
+    <script src="js/auth-redirect.js?v=12"></script>
+    <script src="js/listings.js?v=12"></script>
 </body>
 </html>

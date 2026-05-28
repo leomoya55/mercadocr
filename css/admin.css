@@ -1,0 +1,267 @@
+/* ─── Admin page layout ─────────────────────────────────────────────────────── */
+
+.admin-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.admin-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #e8c97a;
+  color: #0d0d0d;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-guard {
+  text-align: center;
+  padding: 4rem;
+  color: #888;
+  font-size: 1.1rem;
+}
+
+/* ─── Stats row ─────────────────────────────────────────────────────────────── */
+
+.admin-stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  flex: 1;
+  min-width: 120px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 1.2rem 1rem;
+  text-align: center;
+}
+
+.stat-val {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #e8c97a;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  color: #888;
+  margin-top: 0.4rem;
+}
+
+/* ─── Tabs ──────────────────────────────────────────────────────────────────── */
+
+.admin-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #333;
+  margin-bottom: 1.5rem;
+}
+
+.admin-tab {
+  padding: 0.65rem 1.4rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #888;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.admin-tab:hover { color: #fff; }
+.admin-tab.active { color: #e8c97a; border-bottom-color: #e8c97a; }
+
+/* ─── Panels ────────────────────────────────────────────────────────────────── */
+
+.admin-panel { display: none; }
+.admin-panel.active { display: block; }
+
+/* ─── Toolbar ───────────────────────────────────────────────────────────────── */
+
+.admin-toolbar {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.admin-toolbar input[type="search"],
+.admin-toolbar select {
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.88rem;
+}
+
+.admin-toolbar input[type="search"] { flex: 1; min-width: 180px; }
+
+.admin-toolbar button {
+  padding: 0.45rem 1rem;
+  background: #e8c97a;
+  color: #0d0d0d;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.admin-toolbar button:hover { background: #d4b468; }
+
+/* ─── Table ─────────────────────────────────────────────────────────────────── */
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+}
+
+.admin-table th {
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 2px solid #333;
+  color: #888;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid #222;
+  color: #ccc;
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td { border-bottom: none; }
+.admin-table tr:hover td { background: #1a1a1a; }
+
+.admin-loading {
+  color: #666;
+  padding: 2rem 0;
+  text-align: center;
+}
+
+/* ─── Action buttons ────────────────────────────────────────────────────────── */
+
+.admin-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  padding: 0.28rem 0.65rem;
+  border-radius: 5px;
+  border: 1px solid #444;
+  background: #222;
+  color: #ccc;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+
+.btn-sm:hover { background: #2a2a2a; border-color: #666; color: #fff; }
+
+.btn-danger { border-color: #662222; color: #e87a7a; }
+.btn-danger:hover { background: #2a1010; border-color: #a33; color: #f88; }
+
+/* ─── Badges ────────────────────────────────────────────────────────────────── */
+
+.badge-hidden {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #5c1a1a;
+  color: #f88;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.badge-plan {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.18rem 0.5rem;
+  border-radius: 4px;
+}
+.badge-plan-free  { background: #222; color: #888; border: 1px solid #333; }
+.badge-plan-basic { background: #1a2a3a; color: #7ab8e8; border: 1px solid #2a4a6a; }
+.badge-plan-pro   { background: #2a2200; color: #e8c97a; border: 1px solid #4a3a00; }
+
+.badge-report-status {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+.badge-report-pending    { background: #3a2a00; color: #e8c97a; }
+.badge-report-reviewed   { background: #1a2a1a; color: #7ae87a; }
+.badge-report-dismissed  { background: #222; color: #666; }
+.badge-report-actioned   { background: #1a1a3a; color: #7a7ae8; }
+
+/* ─── Pagination ────────────────────────────────────────────────────────────── */
+
+.admin-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* page-btn styles are in listings.css via shared class — redefine locally */
+.admin-pagination .page-btn {
+  padding: 0.35rem 0.7rem;
+  border-radius: 5px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.12s, border-color 0.12s;
+  min-width: 32px;
+}
+
+.admin-pagination .page-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  border-color: #e8c97a;
+}
+
+.admin-pagination .page-btn-active {
+  background: #e8c97a;
+  color: #0d0d0d;
+  border-color: #e8c97a;
+  font-weight: 700;
+}
+
+.admin-pagination .page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .admin-stats { gap: 0.6rem; }
+  .stat-card { min-width: 90px; padding: 0.9rem 0.6rem; }
+  .stat-val { font-size: 1.5rem; }
+  .admin-table { font-size: 0.8rem; }
+  .admin-table th, .admin-table td { padding: 0.45rem 0.5rem; }
+}
