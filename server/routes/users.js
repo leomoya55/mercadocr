@@ -102,9 +102,16 @@ router.put('/:uid/profile', verifyToken, async (req, res) => {
       });
     }
 
+    // Unique phone check — skip for empty values
+    const cleanPhone = (phone || '').trim();
+    if (cleanPhone) {
+      const conflict = await User.findOne({ phone: cleanPhone, firebaseUid: { $ne: req.params.uid } });
+      if (conflict) return res.status(409).json({ error: 'Este número ya está registrado por otra cuenta.' });
+    }
+
     if (nombre    !== undefined) user.nombre    = nombre;
     if (apellido  !== undefined) user.apellido  = apellido;
-    if (phone     !== undefined) user.phone     = phone;
+    if (phone     !== undefined) user.phone     = cleanPhone;
     if (provincia !== undefined) user.provincia = provincia;
     await user.save();
     res.json({ user });

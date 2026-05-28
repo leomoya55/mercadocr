@@ -9,18 +9,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const FREE_LIMIT  = 3;
   const BASIC_LIMIT = 20;
 
+  // authFetch with per-request abort timeout so cold-start hangs fail fast
+  const fetchWithTimeout = (url, opts = {}, ms = 7000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return authFetch(url, { ...opts, signal: controller.signal })
+      .finally(() => clearTimeout(timer));
+  };
+
   const loadDashboard = async (user) => {
-    // Retry up to 3 times — never throw, fall back to sensible defaults
+    // Show loading states immediately so the page feels responsive
+    if (metricFree) metricFree.textContent = '...';
+    if (metricPlan) metricPlan.textContent = '...';
+    if (metricCount) metricCount.textContent = '...';
+    if (listingsContainer) listingsContainer.innerHTML =
+      '<p class="dashboard-empty" style="color:#666;">Cargando tus anuncios...</p>';
+
+    // Retry up to 5 times with short delays — handles cold-start DB reconnects
     let profileData = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 5; attempt++) {
       try {
-        let profileResponse = await authFetch(`/api/users/${user.uid}`);
+        let profileResponse = await fetchWithTimeout(`/api/users/${user.uid}`);
+
         // First-ever login: profile may not exist yet — create it then retry
         if (profileResponse.status === 404) {
           // Pick up phone/provincia stored by register.js before page navigated away
           const regData = JSON.parse(sessionStorage.getItem('mcr_reg') || '{}');
           sessionStorage.removeItem('mcr_reg');
-          await authFetch('/api/users/ensure', {
+          await fetchWithTimeout('/api/users/ensure', {
             method: 'POST',
             body: JSON.stringify({
               email:     user.email,
@@ -30,14 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
               provincia: regData.provincia || '',
             }),
           });
-          profileResponse = await authFetch(`/api/users/${user.uid}`);
+          profileResponse = await fetchWithTimeout(`/api/users/${user.uid}`);
         }
+
         const data = await profileResponse.json();
-        if (data.user) { profileData = data; break; }
+        if (data && data.user) { profileData = data; break; }
         throw new Error('No user in response');
       } catch (err) {
         console.warn(`Dashboard profile attempt ${attempt} failed:`, err.message);
-        if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+        // Short backoff — just enough for a cold-start DB to finish connecting
+        if (attempt < 5) await new Promise(r => setTimeout(r, 600 * attempt));
       }
     }
 
@@ -97,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let listings = [];
     try {
-      const listingsResponse = await authFetch(`/api/listings/user/${user.uid}`);
+      const listingsResponse = await fetchWithTimeout(`/api/listings/user/${user.uid}`);
       const data = await listingsResponse.json();
       listings = Array.isArray(data) ? data : [];
     } catch (err) {
@@ -152,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.disabled = true;
         button.textContent = 'Marcando...';
         try {
-          await authFetch(`/api/listings/mark-sold/${button.getAttribute('data-mark-sold')}`, { method: 'POST' });
+          await fetchWithTimeout(`/api/listings/mark-sold/${button.getAttribute('data-mark-sold')}`, { method: 'POST' });
           window.location.reload();
         } catch {
           button.disabled = false;
@@ -167,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.disabled = true;
         button.textContent = 'Eliminando...';
         try {
-          await authFetch(`/api/listings/delete/${button.getAttribute('data-delete')}`, { method: 'POST' });
+          await fetchWithTimeout(`/api/listings/delete/${button.getAttribute('data-delete')}`, { method: 'POST' });
           window.location.reload();
         } catch {
           button.disabled = false;
@@ -195,12 +213,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadDashboard(user).catch(err => {
       console.error(err);
-      // Re-apply owner UI in case the error path reset something
       if (user.email === OWNER_EMAIL) applyOwnerUI();
       else {
-        // Show fallback metrics so the page isn't useless
         if (metricFree) metricFree.textContent = String(FREE_LIMIT);
-        if (listingsContainer) listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. <a href="" onclick="location.reload();return false;">Recarga la página →</a></p>';
+        if (metricPlan) metricPlan.textContent = 'Gratis';
+        if (metricCount) metricCount.textContent = '0';
+        if (listingsContainer) listingsContainer.innerHTML =
+          '<p class="dashboard-empty">Error al cargar el panel. <a href="" onclick="location.reload();return false;">Recarga la página →</a></p>';
       }
     });
   });

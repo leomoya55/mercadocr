@@ -98,9 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ nombre, apellido, phone, provincia }),
             });
 
+            if (saveRes.status === 409) {
+                throw new Error('Este número de teléfono ya está registrado en otra cuenta.');
+            }
             if (!saveRes.ok) {
-                const errText = await saveRes.text().catch(() => saveRes.status);
-                throw new Error(`Server error: ${errText}`);
+                const errText = await saveRes.text().catch(() => String(saveRes.status));
+                throw new Error(`Error del servidor: ${errText}`);
             }
 
             // Update Firebase display name
