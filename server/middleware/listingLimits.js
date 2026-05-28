@@ -79,8 +79,8 @@ const enforceListingLimit = async (req, res, next) => {
       remaining:   0,
     });
   } catch (err) {
-    console.error('[enforceListingLimit]', err.message);
-    res.status(500).json({ error: 'DB_ERROR' });
+    console.error('[enforceListingLimit] ERROR:', err.name, '|', err.message);
+    res.status(500).json({ error: err.message, code: 'LIMIT_CHECK_FAILED' });
   }
 };
 

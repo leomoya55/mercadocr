@@ -6,10 +6,15 @@ const { isOwner } = require('../config/plans');
  *
  * Uses findOneAndUpdate + upsert:true — never a separate find + create.
  *
- * IMPORTANT: A field must appear in ONLY ONE update operator per operation.
- * MongoDB throws "path conflict" if the same field appears in both $set and
- * $setOnInsert. So for the owner we put plan:'pro' in $set ONLY, and for
- * non-owners we put plan:'free' in $setOnInsert ONLY.
+ * ROOT CAUSE OF PREVIOUS DB_ERROR:
+ *   setDefaultsOnInsert:true tells Mongoose to inject schema defaults into
+ *   $setOnInsert automatically. The User schema has plan:{default:'free'}.
+ *   For the owner we add $set:{plan:'pro'}. Mongoose then ALSO injects
+ *   plan:'free' into $setOnInsert (from the schema default), giving MongoDB
+ *   the same path in two operators → "path conflict at 'plan'" → DB_ERROR.
+ *
+ * FIX: do NOT use setDefaultsOnInsert. Specify every required field explicitly
+ * in $setOnInsert so Mongoose has nothing left to inject.
  *
  * Must run AFTER verifyToken (needs req.uid and req.email).
  */
@@ -19,34 +24,59 @@ const ensureUser = async (req, res, next) => {
     const email = req.email || '';
     const owner = isOwner(email);
 
-    // $setOnInsert: applied only when MongoDB creates a new document.
-    // plan is intentionally omitted here for the owner — $set handles it.
+    //
+    // $setOnInsert — only fires when MongoDB inserts a new document (upsert).
+    //
+    // All schema fields with defaults are listed here explicitly so
+    // Mongoose has nothing to inject via setDefaultsOnInsert.
+    //
+    // plan is intentionally absent for owner: $set handles it on both
+    // insert and update without creating a path conflict.
+    //
     const setOnInsert = {
       email,
-      nombre:            '',
-      apellido:          '',
-      phone:             '',
-      provincia:         '',
-      singlePostCredits: 0,
-      ...(owner ? {} : { plan: 'free' }), // non-owner only: set plan on first insert
+      nombre:              '',
+      apellido:            '',
+      phone:               '',
+      provincia:           '',
+      singlePostCredits:   0,
+      freeListingUsed:     false,
+      listingsCount:       0,
+      planExpiresAt:       null,
+      stripeCustomerId:    null,
+      stripeSubscriptionId: null,
+      createdAt:           new Date(),
+      ...(owner ? {} : { plan: 'free' }),
+      // owner: plan comes from $set below — must NOT be here too
     };
 
     const update = { $setOnInsert: setOnInsert };
 
-    // Owner: force plan:'pro' via $set so it applies on BOTH insert and update.
-    // This must NOT also appear in $setOnInsert (MongoDB path conflict).
+    // Owner: force plan:'pro' via $set (runs on insert AND update).
+    // This field must be absent from $setOnInsert — having it in both
+    // operators causes MongoDB to throw a path-conflict error.
     if (owner) update.$set = { plan: 'pro' };
 
     req.dbUser = await User.findOneAndUpdate(
       { firebaseUid: uid },
       update,
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      {
+        upsert: true,
+        new:    true,
+        // setDefaultsOnInsert is intentionally omitted — we list all fields
+        // explicitly above to prevent Mongoose from injecting plan:'free'
+        // into $setOnInsert for the owner (which would conflict with $set).
+      }
     );
 
     next();
   } catch (err) {
-    console.error('[ensureUser]', err.message);
-    res.status(500).json({ error: 'DB_ERROR' });
+    // Log the full error so the real message is visible in server logs
+    console.error('[ensureUser] ERROR:', err.name, '|', err.message);
+    res.status(500).json({
+      error:   err.message,
+      code:    'ENSURE_USER_FAILED',
+    });
   }
 };
 
