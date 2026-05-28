@@ -89,27 +89,36 @@ const connectDB = async () => {
   }
 };
 
-// Health check — always responds, exposes actual error message for diagnosis
+// Health check — awaits DB connection so status is accurate
 app.get('/api/health', async (req, res) => {
   const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
 
-  // Extract cluster hostname from MONGO_URI and test DNS resolution
+  // Wait for connection so we report the real state, not just "connecting"
+  let connectErr = null;
+  try { await connectDB(); } catch (e) { connectErr = e.message; }
+
+  // Atlas SRV hostnames have no A records — test SRV first, fall back to A
   let dnsStatus = 'no MONGO_URI';
-  const uriMatch = (process.env.MONGO_URI || '').match(/@([^/]+)/);
-  const clusterHost = uriMatch ? uriMatch[1] : null;
+  const uriMatch = (process.env.MONGO_URI || '').match(/@([^/?]+)/);
+  const clusterHost = uriMatch ? uriMatch[1].split(':')[0] : null;
   if (clusterHost) {
     try {
-      await dns.resolve(clusterHost);
-      dnsStatus = 'resolved';
-    } catch (e) {
-      dnsStatus = 'FAILED: ' + e.message;
+      await dns.resolveSrv(`_mongodb._tcp.${clusterHost}`);
+      dnsStatus = 'resolved (SRV)';
+    } catch {
+      try {
+        await dns.resolve(clusterHost);
+        dnsStatus = 'resolved (A)';
+      } catch (e2) {
+        dnsStatus = 'FAILED: ' + e2.message;
+      }
     }
   }
 
   res.json({
     server: 'ok',
     db: states[mongoose.connection.readyState] || 'unknown',
-    dbError: lastDbError || null,
+    dbError: connectErr || lastDbError || null,
     clusterHost,
     dns: dnsStatus,
     env: {
