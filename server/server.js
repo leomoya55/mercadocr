@@ -81,6 +81,7 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
       connectTimeoutMS: 5000,
       socketTimeoutMS: 30000,
+      maxPoolSize: 1,   // serverless: one connection per function instance
     });
     lastDbError = null;
     console.log('MongoDB connected');

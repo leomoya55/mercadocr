@@ -93,17 +93,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const provincia = profileForm['provincia'].value;
 
         try {
-            const saveRes = await authFetch(`/api/users/${user.uid}/profile`, {
-                method: 'PUT',
-                body: JSON.stringify({ nombre, apellido, phone, provincia }),
-            });
+            // Retry the PUT up to 3 times — different Vercel instances may be cold
+            let saveRes;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                saveRes = await authFetch(`/api/users/${user.uid}/profile`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ nombre, apellido, phone, provincia }),
+                });
+                if (saveRes.ok || saveRes.status === 409) break; // success or hard error — stop
+                if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
 
             if (saveRes.status === 409) {
                 throw new Error('Este número de teléfono ya está registrado en otra cuenta.');
             }
             if (!saveRes.ok) {
                 const errText = await saveRes.text().catch(() => String(saveRes.status));
-                throw new Error(`Error del servidor: ${errText}`);
+                throw new Error(`Error del servidor (${saveRes.status}): ${errText}`);
             }
 
             // Update Firebase display name
@@ -117,7 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus(profileStatus, 'Perfil actualizado con éxito.', 'success');
         } catch (err) {
             console.error('Profile save failed:', err.message);
-            showStatus(profileStatus, 'Error al guardar el perfil. Intenta de nuevo.', 'error');
+            showStatus(profileStatus, err.message.startsWith('Este número')
+                ? err.message
+                : 'Error al guardar el perfil. Intenta de nuevo.', 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Guardar cambios';
