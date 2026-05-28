@@ -46,8 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
             }
 
-            // Fire-and-forget — neither call blocks the redirect
+            // Fire-and-forget verification email — doesn't block redirect
             user.sendEmailVerification().catch(e => console.warn('Verification email:', e.message));
+
+            // Store registration data so dashboard can forward it to the profile on first login
+            // (the ensure fetch below may be aborted by the page navigation, so sessionStorage is the safety net)
+            sessionStorage.setItem('mcr_reg', JSON.stringify({ phone, provincia, nombre, apellido }));
 
             user.getIdToken().then(token => {
                 const controller = new AbortController();

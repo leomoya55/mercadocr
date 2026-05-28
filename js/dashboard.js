@@ -17,9 +17,18 @@ document.addEventListener('DOMContentLoaded', () => {
         let profileResponse = await authFetch(`/api/users/${user.uid}`);
         // First-ever login: profile may not exist yet — create it then retry
         if (profileResponse.status === 404) {
+          // Pick up phone/provincia stored by register.js before page navigated away
+          const regData = JSON.parse(sessionStorage.getItem('mcr_reg') || '{}');
+          sessionStorage.removeItem('mcr_reg');
           await authFetch('/api/users/ensure', {
             method: 'POST',
-            body: JSON.stringify({ email: user.email }),
+            body: JSON.stringify({
+              email:     user.email,
+              nombre:    regData.nombre    || '',
+              apellido:  regData.apellido  || '',
+              phone:     regData.phone     || '',
+              provincia: regData.provincia || '',
+            }),
           });
           profileResponse = await authFetch(`/api/users/${user.uid}`);
         }
@@ -94,6 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.warn('Listings fetch failed:', err.message);
     }
+
+    if (!listingsContainer) return;
 
     if (!listings.length) {
       listingsContainer.innerHTML = '<p class="dashboard-empty">Aún no has publicado nada. <a href="/publish">Publica tu primer anuncio gratis →</a></p>';
@@ -186,7 +197,11 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error(err);
       // Re-apply owner UI in case the error path reset something
       if (user.email === OWNER_EMAIL) applyOwnerUI();
-      else if (listingsContainer) listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. Recarga la página.</p>';
+      else {
+        // Show fallback metrics so the page isn't useless
+        if (metricFree) metricFree.textContent = String(FREE_LIMIT);
+        if (listingsContainer) listingsContainer.innerHTML = '<p class="dashboard-empty">Error al cargar el panel. <a href="" onclick="location.reload();return false;">Recarga la página →</a></p>';
+      }
     });
   });
 

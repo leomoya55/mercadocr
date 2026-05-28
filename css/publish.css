@@ -13,6 +13,11 @@
     color: #aaa;
 }
 
+/* Hide the status box when it has no content */
+.publish-status:empty {
+    display: none;
+}
+
 .publish-payments {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

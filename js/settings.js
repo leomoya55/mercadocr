@@ -37,7 +37,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const res = await authFetch(`/api/users/${user.uid}`);
+            let res = await authFetch(`/api/users/${user.uid}`);
+
+            // Profile may not exist yet for brand-new users — create it then retry
+            if (res.status === 404) {
+                await authFetch('/api/users/ensure', {
+                    method: 'POST',
+                    body: JSON.stringify({ email: user.email }),
+                });
+                res = await authFetch(`/api/users/${user.uid}`);
+            }
+
             const data = await res.json();
             const profile = data.user || {};
 
@@ -83,10 +93,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const provincia = profileForm['provincia'].value;
 
         try {
-            await authFetch(`/api/users/${user.uid}/profile`, {
+            const saveRes = await authFetch(`/api/users/${user.uid}/profile`, {
                 method: 'PUT',
                 body: JSON.stringify({ nombre, apellido, phone, provincia }),
             });
+
+            if (!saveRes.ok) {
+                const errText = await saveRes.text().catch(() => saveRes.status);
+                throw new Error(`Server error: ${errText}`);
+            }
 
             // Update Firebase display name
             await user.updateProfile({ displayName: `${nombre} ${apellido}` });
@@ -97,8 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
             lockNameFields();
 
             showStatus(profileStatus, 'Perfil actualizado con éxito.', 'success');
-        } catch {
-            showStatus(profileStatus, 'Error al guardar el perfil.', 'error');
+        } catch (err) {
+            console.error('Profile save failed:', err.message);
+            showStatus(profileStatus, 'Error al guardar el perfil. Intenta de nuevo.', 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Guardar cambios';

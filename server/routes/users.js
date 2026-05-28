@@ -20,71 +20,98 @@ router.get('/public/:uid', async (req, res) => {
 
 // Ensure user profile exists after login/register — auth required
 router.post('/ensure', verifyToken, async (req, res) => {
-  const uid = req.uid;
-  const { email, nombre, apellido, phone, provincia } = req.body;
-  if (!email) return res.status(400).json('Email is required');
+  try {
+    const uid = req.uid;
+    const { email, nombre, apellido, phone, provincia } = req.body;
+    if (!email) return res.status(400).json('Email is required');
 
-  let user = await User.findOne({ firebaseUid: uid });
-  // Use token email (req.email) as the authoritative check — body email is a fallback
-  const isFounder = isOwner(req.email) || isOwner(email);
+    let user = await User.findOne({ firebaseUid: uid });
+    // Use token email (req.email) as the authoritative check — body email is a fallback
+    const isFounder = isOwner(req.email) || isOwner(email);
 
-  if (!user) {
-    user = await User.create({
-      firebaseUid: uid,
-      email,
-      nombre: nombre || '',
-      apellido: apellido || '',
-      phone: phone || '',
-      provincia: provincia || '',
-      plan: isFounder ? 'pro' : 'free',
-    });
-  } else {
-    // Auto-upgrade founder on every login
-    if (isFounder && user.plan !== 'pro') {
-      user.plan = 'pro';
-      await user.save();
+    if (!user) {
+      user = await User.create({
+        firebaseUid: uid,
+        email,
+        nombre: nombre || '',
+        apellido: apellido || '',
+        phone: phone || '',
+        provincia: provincia || '',
+        plan: isFounder ? 'pro' : 'free',
+      });
+    } else {
+      let changed = false;
+      // Fill in any missing profile fields that were passed (e.g. from registration)
+      if (phone && !user.phone)       { user.phone    = phone;    changed = true; }
+      if (provincia && !user.provincia){ user.provincia = provincia; changed = true; }
+      if (nombre && !user.nombre)     { user.nombre   = nombre;   changed = true; }
+      if (apellido && !user.apellido) { user.apellido  = apellido;  changed = true; }
+      // Auto-upgrade founder on every login
+      if (isFounder && user.plan !== 'pro') { user.plan = 'pro'; changed = true; }
+      if (changed) await user.save();
     }
+    res.json({ user });
+  } catch (err) {
+    console.error('[ensure]', err.message);
+    res.status(500).json({ error: err.message });
   }
-  res.json({ user });
 });
 
 // Get own user profile — auth required
 router.get('/:uid', verifyToken, async (req, res) => {
-  if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
+  try {
+    if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
 
-  const user = await User.findOne({ firebaseUid: req.params.uid });
-  if (!user) return res.status(404).json('User not found');
+    const user = await User.findOne({ firebaseUid: req.params.uid });
+    if (!user) return res.status(404).json('User not found');
 
-  // Owner always has Pro — check Firebase token email (most reliable) then DB email
-  if (isOwner(req.email) || isOwner(user.email)) {
-    if (user.plan !== 'pro') {
-      user.plan = 'pro';
-      user.save().catch(e => console.error('[owner upgrade]', e.message));
+    // Owner always has Pro — check Firebase token email (most reliable) then DB email
+    if (isOwner(req.email) || isOwner(user.email)) {
+      if (user.plan !== 'pro') {
+        user.plan = 'pro';
+        user.save().catch(e => console.error('[owner upgrade]', e.message));
+      }
+      const userObj = user.toObject();
+      userObj.plan = 'pro';
+      const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
+      return res.json({ user: userObj, listingCount });
     }
-    const userObj = user.toObject();
-    userObj.plan = 'pro';
-    const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
-    return res.json({ user: userObj, listingCount });
-  }
 
-  const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
-  res.json({ user, listingCount });
+    const listingCount = await Listing.countDocuments({ author: req.params.uid, status: { $ne: 'sold' } });
+    res.json({ user, listingCount });
+  } catch (err) {
+    console.error('[GET /:uid]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Update profile info (nombre, apellido, phone, provincia) — auth required
 router.put('/:uid/profile', verifyToken, async (req, res) => {
-  if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
+  try {
+    if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
 
-  const user = await User.findOne({ firebaseUid: req.params.uid });
-  if (!user) return res.status(404).json('User not found');
+    const { nombre, apellido, phone, provincia } = req.body;
 
-  const { nombre, apellido, phone, provincia } = req.body;
-  if (nombre !== undefined) user.nombre = nombre;
-  if (apellido !== undefined) user.apellido = apellido;
-  if (phone !== undefined) user.phone = phone;
-  if (provincia !== undefined) user.provincia = provincia;
-  await user.save();
-  res.json({ user });
+    // Upsert: create profile if it doesn't exist yet (handles race on first visit)
+    let user = await User.findOne({ firebaseUid: req.params.uid });
+    if (!user) {
+      user = new User({
+        firebaseUid: req.params.uid,
+        email: req.email || '',
+        plan: isOwner(req.email) ? 'pro' : 'free',
+      });
+    }
+
+    if (nombre    !== undefined) user.nombre    = nombre;
+    if (apellido  !== undefined) user.apellido  = apellido;
+    if (phone     !== undefined) user.phone     = phone;
+    if (provincia !== undefined) user.provincia = provincia;
+    await user.save();
+    res.json({ user });
+  } catch (err) {
+    console.error('[PUT /:uid/profile]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Update plan — auth required (webhook is primary source)
