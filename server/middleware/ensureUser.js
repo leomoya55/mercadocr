@@ -22,6 +22,16 @@ const ensureUser = async (req, res, next) => {
   try {
     const uid   = req.uid;
     const email = req.email || '';
+
+    // Hard guard — uid must be set by verifyToken before this middleware runs.
+    // An upsert with uid=null/undefined would match NO document but still write a
+    // new record with firebaseUid:null, triggering E11000 on the uid_1 stale index
+    // (and again for every subsequent user). Reject early so the DB is never touched.
+    if (!uid) {
+      console.error('[ensureUser] uid is null/undefined — verifyToken must run first');
+      return res.status(401).json({ error: 'UID missing from token', code: 'NO_UID' });
+    }
+
     const owner = isOwner(email);
 
     //

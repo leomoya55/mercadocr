@@ -26,6 +26,11 @@ const verifyToken = async (req, res, next) => {
     if (hasAdminConfig) {
       // Production: full cryptographic verification
       const decoded = await admin.auth().verifyIdToken(token);
+      // Temporary diagnostic log — remove once E11000 stale-index issue is confirmed gone
+      console.log('[verifyToken] decoded.uid present:', !!decoded.uid, '| type:', typeof decoded.uid);
+      if (!decoded.uid) {
+        return res.status(401).json({ error: 'Token missing UID', code: 'NO_UID_IN_TOKEN' });
+      }
       req.uid   = decoded.uid;
       req.email = (decoded.email || '').toLowerCase().trim();
     } else {

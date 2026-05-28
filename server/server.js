@@ -66,6 +66,62 @@ app.use(express.static(path.join(__dirname, '../'), { extensions: ['html'] }));
 // Serverless-safe MongoDB connection
 let lastDbError = null;
 
+// ─── Startup migrations ───────────────────────────────────────────────────────
+//
+// Runs once per cold start, immediately after the first successful DB connect.
+// Each step is idempotent — safe to run on every deploy / restart.
+//
+//  1. Drop the stale uid_1 index (old schema used field 'uid'; current schema uses
+//     'firebaseUid'). Without dropping it, every new user upsert writes firebaseUid
+//     and leaves uid absent — MongoDB stores that as uid:null in the non-sparse
+//     index. The second new user hits E11000 duplicate key { uid: null }.
+//
+//  2. Migrate any legacy documents that stored the UID in 'uid' (not 'firebaseUid').
+//     ensureUser's filter is { firebaseUid: uid }, so these records are invisible to
+//     the current code and trigger a new-insert attempt on every login → E11000.
+//
+//  3. Delete corrupted documents produced by past failed upserts: those with
+//     firebaseUid null or missing are unusable orphan records and block new
+//     registrations.
+//
+async function runStartupMigrations() {
+  try {
+    const col = mongoose.connection.collection('users');
+
+    // 1. Drop stale uid_1 index
+    try {
+      await col.dropIndex('uid_1');
+      console.log('[migration] Dropped stale uid_1 index');
+    } catch (err) {
+      if (err.code === 27) {
+        // IndexNotFound — already dropped or never existed; nothing to do
+      } else {
+        console.warn('[migration] uid_1 dropIndex failed:', err.code, err.message);
+      }
+    }
+
+    // 2. Rename uid → firebaseUid on old documents
+    const migrated = await col.updateMany(
+      { uid: { $exists: true }, firebaseUid: { $exists: false } },
+      { $rename: { uid: 'firebaseUid' } }
+    );
+    if (migrated.modifiedCount > 0) {
+      console.log(`[migration] Renamed uid→firebaseUid on ${migrated.modifiedCount} document(s)`);
+    }
+
+    // 3. Delete corrupted documents with null/missing firebaseUid
+    const deleted = await col.deleteMany({
+      $or: [{ firebaseUid: null }, { firebaseUid: { $exists: false } }],
+    });
+    if (deleted.deletedCount > 0) {
+      console.log(`[migration] Deleted ${deleted.deletedCount} corrupted user doc(s) (null/missing firebaseUid)`);
+    }
+  } catch (err) {
+    // Never let a migration error prevent the server from starting
+    console.error('[migration] Startup migration error:', err.message);
+  }
+}
+
 const connectDB = async () => {
   const state = mongoose.connection.readyState;
   if (state === 1) return;
@@ -85,6 +141,9 @@ const connectDB = async () => {
     });
     lastDbError = null;
     console.log('MongoDB connected');
+    // Run once per cold start — drops stale uid_1 index, migrates old uid field,
+    // cleans up corrupted documents. All steps are idempotent.
+    await runStartupMigrations();
   } catch (err) {
     lastDbError = err.message;
     throw err;
