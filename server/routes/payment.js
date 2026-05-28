@@ -128,18 +128,26 @@ router.post('/webhook', async (req, res) => {
 // Cancel subscription at period end — auth required
 router.post('/cancel-subscription', verifyToken, async (req, res) => {
   const uid = req.uid;
-  const user = await User.findOne({ firebaseUid: uid });
-  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Read only the fields we need — lean() avoids a full document load
+  const user = await User.findOne({ firebaseUid: uid })
+    .select('stripeSubscriptionId').lean();
+  if (!user)                     return res.status(404).json({ error: 'User not found' });
   if (!user.stripeSubscriptionId) return res.status(400).json({ error: 'No active subscription' });
 
   try {
+    // Tell Stripe to cancel at the end of the billing period
     await stripe.subscriptions.update(user.stripeSubscriptionId, { cancel_at_period_end: true });
-    user.plan = 'free';
-    user.stripeSubscriptionId = null;
-    user.planExpiresAt = null;
-    await user.save();
+
+    // Atomic update — no separate find + save race condition
+    await User.findOneAndUpdate(
+      { firebaseUid: uid },
+      { $set: { plan: 'free', stripeSubscriptionId: null, planExpiresAt: null } }
+    );
+
     const Listing = require('../models/listing.model');
     await Listing.updateMany({ author: uid }, { featured: false });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Cancel subscription error:', error);

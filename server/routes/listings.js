@@ -1,13 +1,15 @@
-const router = require('express').Router();
+const router  = require('express').Router();
 const Listing = require('../models/listing.model');
-const User = require('../models/user.model');
-const upload = require('../config/cloudinary');
-const { verifyToken } = require('../middleware/auth');
+const User    = require('../models/user.model');
+const upload  = require('../config/cloudinary');
+const { verifyToken }          = require('../middleware/auth');
+const { ensureUser }           = require('../middleware/ensureUser');
+const { enforceListingLimit }  = require('../middleware/listingLimits');
+const { isOwner }              = require('../config/plans');
 
-const FREE_LIMIT  = 3;
-const BASIC_LIMIT = 20;
+// ─── Public ──────────────────────────────────────────────────────────────────
 
-// Get all active listings — public
+// GET / — all active listings, featured first
 router.get('/', (req, res) => {
   Listing.find({ status: { $ne: 'sold' } })
     .sort({ featured: -1, createdAt: -1 })
@@ -15,64 +17,7 @@ router.get('/', (req, res) => {
     .catch(err => res.status(400).json('Error: ' + err));
 });
 
-// Add new listing — auth required
-router.post('/add', verifyToken, upload.array('photos'), async (req, res) => {
-  try {
-    const uid = req.uid;
-    const { name, description, price, category } = req.body;
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json('At least one photo is required');
-    }
-
-    const photos = req.files.map(file => file.path);
-    let user = await User.findOne({ firebaseUid: uid });
-
-    // Profile doesn't exist yet — create it on the fly so publishing never hard-fails
-    if (!user) {
-      user = await User.create({
-        firebaseUid: uid,
-        email: req.email || '',
-        plan: 'free',
-      });
-    }
-
-    // Pull provincia and contact from the user's profile
-    const provincia = user.provincia || '';
-    const contact   = user.phone    || user.email || '';
-
-    // Count only active (non-sold) listings for limit checks
-    const activeCount = await Listing.countDocuments({ author: uid, status: { $ne: 'sold' } });
-
-    let featured = false;
-
-    if (user.plan === 'pro') {
-      featured = true;
-    } else if (user.plan === 'basic') {
-      if (activeCount >= BASIC_LIMIT) {
-        return res.status(402).json({ error: 'Basic plan limit reached', code: 'LIMIT_REACHED' });
-      }
-    } else {
-      // Free plan
-      if (activeCount < FREE_LIMIT) {
-        // within free limit — no credit consumed
-      } else if (user.singlePostCredits > 0) {
-        user.singlePostCredits -= 1;
-        await user.save();
-      } else {
-        return res.status(402).json({ error: 'Payment required', code: 'PAYMENT_REQUIRED' });
-      }
-    }
-
-    const newListing = new Listing({ name, description, price, category, photos, contact, provincia, author: uid, featured });
-    await newListing.save();
-    res.json({ message: 'Listing added!', featured });
-  } catch (err) {
-    console.error('Add listing error:', err);
-    res.status(500).json('Error: ' + err.message);
-  }
-});
-
-// Get listings by user — public
+// GET /user/:uid — all listings for a user (public profile view)
 router.get('/user/:uid', (req, res) => {
   Listing.find({ author: req.params.uid })
     .sort({ status: 1, createdAt: -1 }) // active first, then sold
@@ -80,82 +25,145 @@ router.get('/user/:uid', (req, res) => {
     .catch(err => res.status(400).json('Error: ' + err));
 });
 
-// Get listing by ID — public, includes seller info
+// GET /:id — single listing with seller info
 router.get('/:id', async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id).lean();
     if (!listing) return res.status(404).json('Listing not found');
     const seller = await User.findOne({ firebaseUid: listing.author })
-      .select('nombre apellido phone provincia -_id')
-      .lean();
+      .select('nombre apellido phone provincia -_id').lean();
     res.json({ ...listing, seller: seller || null });
   } catch (err) {
     res.status(400).json('Error: ' + err);
   }
 });
 
-// Update listing — auth required, must own listing
+// ─── Authenticated ────────────────────────────────────────────────────────────
+
+/**
+ * POST /add
+ * Middleware chain:
+ *   verifyToken      → authenticates, sets req.uid + req.email
+ *   ensureUser       → upserts DB profile, sets req.dbUser
+ *   enforceListingLimit → checks count against plan limit, may decrement credits
+ *   upload.array     → parses multipart form (must come AFTER limit check so
+ *                       Cloudinary upload is never triggered for rejected posts)
+ *
+ * Handler has zero plan / limit logic — all of that lives in middleware.
+ */
+router.post('/add',
+  verifyToken,
+  ensureUser,
+  enforceListingLimit,
+  upload.array('photos'),
+  async (req, res) => {
+    try {
+      const uid  = req.uid;
+      const user = req.dbUser;
+      const { name, description, price, category } = req.body;
+
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json('At least one photo is required');
+      }
+
+      const photos    = req.files.map(f => f.path);
+      const provincia = user.provincia || '';
+      const contact   = user.phone    || user.email || '';
+
+      // Pro plan (and owner) get all listings featured automatically
+      const featured = user.plan === 'pro' || isOwner(req.email);
+
+      const newListing = new Listing({
+        name, description, price, category,
+        photos, contact, provincia,
+        author: uid, featured,
+      });
+      await newListing.save();
+
+      res.json({ message: 'Listing added!', featured });
+    } catch (err) {
+      console.error('[POST /add]', err);
+      res.status(500).json('Error: ' + err.message);
+    }
+  }
+);
+
+/**
+ * POST /update/:id
+ * Only the owner of the listing can update it.
+ * Replaces photos only when new files are uploaded.
+ */
 router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res) => {
   try {
-    const uid = req.uid;
-    const { name, description, price, category } = req.body;
+    const uid     = req.uid;
     const listing = await Listing.findById(req.params.id);
-    if (!listing) return res.status(404).json('Listing not found');
+    if (!listing)             return res.status(404).json('Listing not found');
     if (listing.author !== uid) return res.status(403).json('Not authorized');
 
-    // Keep provincia/contact from profile if listing doesn't have them yet
+    const { name, description, price, category } = req.body;
+
+    // Back-fill provincia/contact from profile if still missing on listing
     if (!listing.provincia || !listing.contact) {
-      const user = await User.findOne({ firebaseUid: uid });
+      const user = await User.findOne({ firebaseUid: uid }).lean();
       if (user) {
         if (!listing.provincia) listing.provincia = user.provincia || '';
         if (!listing.contact)   listing.contact   = user.phone || user.email || '';
       }
     }
 
-    listing.name = name;
+    listing.name        = name;
     listing.description = description;
-    listing.price = price;
-    listing.category = category;
+    listing.price       = price;
+    listing.category    = category;
     if (req.files && req.files.length > 0) {
-      listing.photos = req.files.map(file => file.path);
+      listing.photos = req.files.map(f => f.path);
     }
+
     await listing.save();
     res.json('Listing updated');
   } catch (err) {
-    console.error('Update listing error:', err);
+    console.error('[POST /update]', err);
     res.status(500).json('Error: ' + err.message);
   }
 });
 
-// Mark listing as sold — auth required, must own listing
+/**
+ * POST /mark-sold/:id
+ * Sets status = 'sold', which immediately frees a slot in the active count
+ * (getActiveCount excludes sold listings via { status: { $ne: 'sold' } }).
+ */
 router.post('/mark-sold/:id', verifyToken, async (req, res) => {
   try {
-    const uid = req.uid;
+    const uid     = req.uid;
     const listing = await Listing.findById(req.params.id);
-    if (!listing) return res.status(404).json('Listing not found');
+    if (!listing)             return res.status(404).json('Listing not found');
     if (listing.author !== uid) return res.status(403).json('Not authorized');
 
     listing.status = 'sold';
     await listing.save();
     res.json('Listing marked as sold');
   } catch (err) {
-    console.error('Mark sold error:', err);
+    console.error('[POST /mark-sold]', err);
     res.status(500).json('Error: ' + err.message);
   }
 });
 
-// Delete listing — auth required, must own listing
+/**
+ * POST /delete/:id
+ * Hard-deletes the document. Because getActiveCount only counts existing
+ * documents, deletion immediately frees a slot — no extra bookkeeping needed.
+ */
 router.post('/delete/:id', verifyToken, async (req, res) => {
   try {
-    const uid = req.uid;
+    const uid     = req.uid;
     const listing = await Listing.findById(req.params.id);
-    if (!listing) return res.status(404).json('Listing not found');
+    if (!listing)             return res.status(404).json('Listing not found');
     if (listing.author !== uid) return res.status(403).json('Not authorized');
 
     await listing.deleteOne();
     res.json('Listing deleted');
   } catch (err) {
-    console.error('Delete listing error:', err);
+    console.error('[POST /delete]', err);
     res.status(500).json('Error: ' + err.message);
   }
 });

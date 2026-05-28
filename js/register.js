@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('register-form');
     const submitButton = registerForm.querySelector('button[type="submit"]');
 
-    // Create inline error element
+    // Inline error display
     const errorEl = document.createElement('p');
     errorEl.style.cssText = 'color:#e08080;font-size:0.88rem;margin:0.5rem 0 0;';
     errorEl.style.display = 'none';
@@ -18,12 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         clearError();
 
-        const nombre    = (registerForm.nombre?.value || '').trim();
-        const apellido  = (registerForm.apellido?.value || '').trim();
-        const email     = registerForm.email.value.trim();
-        const phone     = (registerForm.phone?.value || '').trim();
-        const provincia = registerForm.provincia?.value || '';
-        const password  = registerForm.password.value;
+        const nombre    = (registerForm.nombre?.value    || '').trim();
+        const apellido  = (registerForm.apellido?.value  || '').trim();
+        const email     =  registerForm.email.value.trim();
+        const phone     = (registerForm.phone?.value     || '').trim();
+        const provincia =  registerForm.provincia?.value || '';
+        const password  =  registerForm.password.value;
         const confirmPassword = registerForm['confirm-password'].value;
 
         if (password !== confirmPassword) {
@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.textContent = 'Verificando...';
 
         // ── Step 1: Check phone uniqueness BEFORE creating Firebase account ──
+        // This is a best-effort check — the server validates again on profile save.
         if (phone) {
             try {
                 const checkRes = await fetch(
@@ -48,59 +49,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             } catch {
-                // If the check fails (cold start), continue — ensure validates again server-side
+                // Fail open — server-side check runs again when profile is saved
             }
         }
 
         submitButton.textContent = 'Creando cuenta...';
 
         try {
-            // ── Step 2: Create Firebase auth account ──
+            // ── Step 2: Create Firebase auth account ──────────────────────────
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             const user = userCredential.user;
 
-            // Set Firebase display name
             if (nombre && apellido) {
                 await user.updateProfile({ displayName: `${nombre} ${apellido}` });
                 const navBtn = document.getElementById('nav-user-btn');
                 if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
             }
 
-            // Send verification email (fire-and-forget — doesn't block redirect)
+            // Send verification email — fire and forget, doesn't block redirect
             user.sendEmailVerification().catch(e => console.warn('Verification email:', e.message));
 
-            // ── Step 3: Save profile to DB — AWAITED with 5s timeout ──
-            // This guarantees phone, provincia, nombre, apellido are stored permanently.
-            // sessionStorage is the safety net if this times out (dashboard picks it up).
+            // ── Step 3: Persist registration data for the next page load ──────
+            // UserStore.getProfile() reads this on the first authenticated request
+            // (dashboard/publish/settings) and forwards it to PUT /api/users/me/profile,
+            // saving nombre, apellido, phone, and provincia permanently.
             sessionStorage.setItem('mcr_reg', JSON.stringify({ phone, provincia, nombre, apellido }));
-            submitButton.textContent = 'Guardando perfil...';
-            try {
-                const token = await user.getIdToken();
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 5000);
-                const ensureRes = await fetch(API_BASE_URL + '/api/users/ensure', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ email, nombre, apellido, phone, provincia }),
-                    signal: controller.signal,
-                });
-                clearTimeout(timer);
-
-                if (ensureRes.status === 409) {
-                    // Phone was taken by the time we got here (race condition)
-                    // Profile was still created but without the phone
-                    console.warn('Phone conflict on ensure — profile saved without phone');
-                }
-                // Profile saved — clear the sessionStorage safety net
-                if (ensureRes.ok) sessionStorage.removeItem('mcr_reg');
-            } catch (profileErr) {
-                // Timed out or network error — sessionStorage still has the data
-                // Dashboard will forward it to ensure on first visit
-                console.warn('Profile save during registration:', profileErr.message);
-            }
 
             sessionStorage.setItem('verificationEmail', email);
             window.location.href = '/verify-email';

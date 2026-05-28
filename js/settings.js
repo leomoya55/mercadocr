@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const profileForm  = document.getElementById('profile-form');
-    const passwordForm = document.getElementById('password-form');
+    const profileForm    = document.getElementById('profile-form');
+    const passwordForm   = document.getElementById('password-form');
     const profileStatus  = document.getElementById('profile-status');
     const passwordStatus = document.getElementById('password-status');
 
@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
             el.style.cursor  = 'not-allowed';
             el.title = 'El nombre no puede modificarse una vez registrado';
         });
-        // Add note below the name row
         const existingNote = document.getElementById('name-lock-note');
         if (!existingNote) {
             const note = document.createElement('p');
@@ -30,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ─── Load profile ─────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (user) => {
         if (!user) {
             window.location.href = '/login';
@@ -37,18 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            let res = await authFetch(`/api/users/${user.uid}`);
-
-            // Profile may not exist yet for brand-new users — create it then retry
-            if (res.status === 404) {
-                await authFetch('/api/users/ensure', {
-                    method: 'POST',
-                    body: JSON.stringify({ email: user.email }),
-                });
-                res = await authFetch(`/api/users/${user.uid}`);
-            }
-
-            const data = await res.json();
+            // UserStore handles retries + mcr_reg forwarding automatically
+            const data    = await UserStore.getProfile(user);
             const profile = data.user || {};
 
             // Fallback: if DB has no name, parse Firebase displayName
@@ -67,8 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (nombre && apellido) lockNameFields();
         } catch (err) {
-            console.error(err);
-            // Fallback to Firebase displayName even if API fails
+            console.error('[settings] profile load failed:', err);
+            // Fallback to Firebase displayName if API is down
             if (user.displayName) {
                 const parts = user.displayName.trim().split(' ');
                 profileForm['nombre'].value   = parts[0] || '';
@@ -78,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ─── Save profile ─────────────────────────────────────────────────────────
     profileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = auth.currentUser;
@@ -93,14 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const provincia = profileForm['provincia'].value;
 
         try {
-            // Retry the PUT up to 3 times — different Vercel instances may be cold
+            // Retry up to 3 times — different Vercel instances may be cold
             let saveRes;
             for (let attempt = 1; attempt <= 3; attempt++) {
-                saveRes = await authFetch(`/api/users/${user.uid}/profile`, {
+                saveRes = await authFetch('/api/users/me/profile', {
                     method: 'PUT',
                     body: JSON.stringify({ nombre, apellido, phone, provincia }),
                 });
-                if (saveRes.ok || saveRes.status === 409) break; // success or hard error — stop
+                if (saveRes.ok || saveRes.status === 409) break;
                 if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
             }
 
@@ -112,26 +103,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Error del servidor (${saveRes.status}): ${errText}`);
             }
 
+            // Invalidate profile cache so other pages re-fetch the new data
+            UserStore.invalidate();
+
             // Update Firebase display name
             await user.updateProfile({ displayName: `${nombre} ${apellido}` });
             const navBtn = document.getElementById('nav-user-btn');
             if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
 
-            // Lock name fields now that they're set
             lockNameFields();
-
             showStatus(profileStatus, 'Perfil actualizado con éxito.', 'success');
         } catch (err) {
             console.error('Profile save failed:', err.message);
-            showStatus(profileStatus, err.message.startsWith('Este número')
-                ? err.message
-                : 'Error al guardar el perfil. Intenta de nuevo.', 'error');
+            showStatus(
+                profileStatus,
+                err.message.startsWith('Este número')
+                    ? err.message
+                    : 'Error al guardar el perfil. Intenta de nuevo.',
+                'error'
+            );
         } finally {
             btn.disabled = false;
             btn.textContent = 'Guardar cambios';
         }
     });
 
+    // ─── Change password ──────────────────────────────────────────────────────
     passwordForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = auth.currentUser;

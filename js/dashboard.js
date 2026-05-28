@@ -1,16 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const metricCount = document.getElementById('metric-count');
-  const metricFree = document.getElementById('metric-free');
-  const metricPlan = document.getElementById('metric-plan');
+  const metricCount       = document.getElementById('metric-count');
+  const metricFree        = document.getElementById('metric-free');
+  const metricPlan        = document.getElementById('metric-plan');
   const listingsContainer = document.getElementById('dashboard-listings');
-  const upgradeSection = document.getElementById('dashboard-upgrade');
-  const upgradeButton = document.getElementById('upgrade-pro');
+  const upgradeSection    = document.getElementById('dashboard-upgrade');
+  const upgradeButton     = document.getElementById('upgrade-pro');
 
-  const FREE_LIMIT  = 3;
-  const BASIC_LIMIT = 20;
   const OWNER_EMAIL = 'leomoyawr300@gmail.com';
 
-  // 12s > Vercel's 10s function timeout — Vercel always responds before we abort.
+  // 12s > Vercel's 10s function timeout — server always responds before abort.
   const fetchWithTimeout = (url, opts = {}, ms = 12000) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ms);
@@ -18,17 +16,19 @@ document.addEventListener('DOMContentLoaded', () => {
       .finally(() => clearTimeout(timer));
   };
 
-  // ─── Listings renderer — shared between normal and fallback paths ────────────
+  // ─── Listings renderer ────────────────────────────────────────────────────
   function renderListings(listings, container) {
     container.innerHTML = '';
     listings.forEach(listing => {
-      const card = document.createElement('div');
+      const card   = document.createElement('div');
       card.className = 'listing-item';
-      const isSold = listing.status === 'sold';
+      const isSold        = listing.status === 'sold';
       const featuredBadge = listing.featured && !isSold ? '<span class="badge-featured">Destacado</span>' : '';
       const soldBadge     = isSold ? '<span class="badge-sold">Vendido</span>' : '';
       const editBtn       = !isSold ? `<button data-edit="${listing._id}">Editar</button>` : '';
-      const markSoldBtn   = !isSold ? `<button data-mark-sold="${listing._id}" class="btn-mark-sold">Marcar vendido</button>` : '';
+      const markSoldBtn   = !isSold
+        ? `<button data-mark-sold="${listing._id}" class="btn-mark-sold">Marcar vendido</button>`
+        : '';
 
       card.innerHTML = `
         <img src="${escapeHtml(listing.photos[0])}" alt="${escapeHtml(listing.name)}"${isSold ? ' style="opacity:0.55"' : ''}>
@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = 'Marcando...';
         try {
           await fetchWithTimeout(`/api/listings/mark-sold/${btn.getAttribute('data-mark-sold')}`, { method: 'POST' });
+          UserStore.invalidate();
           window.location.reload();
         } catch {
           btn.disabled = false;
@@ -77,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = 'Eliminando...';
         try {
           await fetchWithTimeout(`/api/listings/delete/${btn.getAttribute('data-delete')}`, { method: 'POST' });
+          UserStore.invalidate();
           window.location.reload();
         } catch {
           btn.disabled = false;
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ─── Listings fetcher ────────────────────────────────────────────────────────
+  // ─── Listings fetcher ─────────────────────────────────────────────────────
   async function loadListings(uid) {
     try {
       const r = await fetchWithTimeout(`/api/listings/user/${uid}`);
@@ -98,56 +100,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ─── Main dashboard loader ───────────────────────────────────────────────────
+  // ─── Metric helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Compute the "Publicaciones disponibles" display string.
+   * Uses server-computed `remaining` so the frontend never duplicates limit logic.
+   *
+   * @param {string} plan     — 'free' | 'basic' | 'pro'
+   * @param {number|null} remaining — null means unlimited (Pro)
+   * @param {number} credits  — singlePostCredits (free plan only)
+   */
+  function buildAvailableText(plan, remaining, credits) {
+    if (plan === 'pro' || remaining === null) return 'Ilimitadas';
+    if (remaining > 0)  return String(remaining);
+    if (credits  > 0)   return `${credits} crédito${credits !== 1 ? 's' : ''}`;
+    return '0';
+  }
+
+  function applyOwnerUI() {
+    if (metricPlan)     metricPlan.textContent  = 'Pro';
+    if (metricFree)     metricFree.textContent  = 'Ilimitadas';
+    if (upgradeSection) upgradeSection.classList.add('hidden');
+  }
+
+  // ─── Main loader ──────────────────────────────────────────────────────────
   const loadDashboard = async (user) => {
-    // Show loading states immediately
-    if (metricFree)  metricFree.textContent  = '...';
-    if (metricPlan)  metricPlan.textContent  = '...';
-    if (metricCount) metricCount.textContent = '...';
+    if (metricFree)        metricFree.textContent  = '...';
+    if (metricPlan)        metricPlan.textContent  = '...';
+    if (metricCount)       metricCount.textContent = '...';
     if (listingsContainer) listingsContainer.innerHTML =
       '<p class="dashboard-empty" style="color:#666;">Cargando tus anuncios...</p>';
 
-    // Retry profile up to 5 times — handles cold-start DB reconnects
+    // UserStore handles retries, mcr_reg forwarding, and owner override
     let profileData = null;
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      try {
-        let profileResponse = await fetchWithTimeout(`/api/users/${user.uid}`);
-
-        // First-ever login: profile may not exist — create it then retry
-        if (profileResponse.status === 404) {
-          const regData = JSON.parse(sessionStorage.getItem('mcr_reg') || '{}');
-          sessionStorage.removeItem('mcr_reg');
-          await fetchWithTimeout('/api/users/ensure', {
-            method: 'POST',
-            body: JSON.stringify({
-              email:     user.email,
-              nombre:    regData.nombre    || '',
-              apellido:  regData.apellido  || '',
-              phone:     regData.phone     || '',
-              provincia: regData.provincia || '',
-            }),
-          });
-          profileResponse = await fetchWithTimeout(`/api/users/${user.uid}`);
-        }
-
-        const data = await profileResponse.json();
-        if (data && data.user) { profileData = data; break; }
-        throw new Error('No user in response');
-      } catch (err) {
-        console.warn(`Dashboard profile attempt ${attempt} failed:`, err.message);
-        if (attempt < 5) await new Promise(r => setTimeout(r, 600 * attempt));
-      }
+    try {
+      profileData = await UserStore.getProfile(user);
+    } catch (err) {
+      console.warn('Dashboard profile failed:', err.message);
     }
 
-    // ── Profile API failed — show fallback metrics + still try listings ───────
     if (!profileData) {
-      const isOwnerUser = user.email === OWNER_EMAIL;
-      if (metricCount) metricCount.textContent = '0';
-      if (metricPlan)  metricPlan.textContent  = isOwnerUser ? 'Pro' : 'Gratis';
-      if (metricFree)  metricFree.textContent  = isOwnerUser ? 'Ilimitadas' : String(FREE_LIMIT);
-      if (upgradeSection) upgradeSection.classList.toggle('hidden', isOwnerUser);
-
-      // Still try to show listings — this endpoint is simpler and may succeed
+      // Profile API failed — show safe fallback values
+      if (user.email === OWNER_EMAIL) {
+        applyOwnerUI();
+      } else {
+        if (metricCount)    metricCount.textContent = '0';
+        if (metricPlan)     metricPlan.textContent  = 'Gratis';
+        if (metricFree)     metricFree.textContent  = '3'; // FREE_LIMIT fallback
+        if (upgradeSection) upgradeSection.classList.remove('hidden');
+      }
       if (listingsContainer) {
         const listings = await loadListings(user.uid);
         if (!listings.length) {
@@ -161,40 +162,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Profile loaded ────────────────────────────────────────────────────────
-    const profile = profileData.user;
-    if (user.email === OWNER_EMAIL) profile.plan = 'pro';
+    const profile      = profileData.user;
     const listingCount = profileData.listingCount || 0;
+    const credits      = profileData.credits      || 0; // from API (singlePostCredits)
+    const remaining    = profileData.remaining;          // null = unlimited, number = slots left
 
     if (metricCount) metricCount.textContent = listingCount;
 
     const planLabels = { free: 'Gratis', basic: 'Basic', pro: 'Pro' };
     if (metricPlan) metricPlan.textContent = planLabels[profile.plan] || 'Gratis';
 
-    const credits = profile.singlePostCredits || 0;
-
     if (metricFree) {
-      let freeText;
-      if (profile.plan === 'pro') {
-        freeText = 'Ilimitadas';
-      } else if (profile.plan === 'basic') {
-        freeText = String(Math.max(0, BASIC_LIMIT - listingCount));
-      } else {
-        const remaining = Math.max(0, FREE_LIMIT - listingCount);
-        freeText = remaining > 0 ? String(remaining)
-          : credits > 0 ? `${credits} crédito${credits !== 1 ? 's' : ''}`
-          : '0';
-      }
-      metricFree.textContent = freeText;
+      metricFree.textContent = buildAvailableText(profile.plan, remaining, credits);
     }
 
-    const creditsCard    = document.getElementById('metric-credits-card');
-    const metricCredits  = document.getElementById('metric-credits');
+    const creditsCard   = document.getElementById('metric-credits-card');
+    const metricCredits = document.getElementById('metric-credits');
     if (creditsCard && profile.plan === 'free') {
       creditsCard.style.display = '';
       if (metricCredits) metricCredits.textContent = credits;
     }
 
-    if (upgradeSection) upgradeSection.classList.toggle('hidden', profile.plan === 'pro');
+    // Show upgrade banner unless Pro or no slots warning needed
+    if (upgradeSection) {
+      const limitReached = remaining !== null && remaining === 0 && credits === 0;
+      upgradeSection.classList.toggle('hidden', profile.plan === 'pro');
+      // Add urgency class when limit is actually hit
+      upgradeSection.classList.toggle('upgrade-urgent', limitReached && profile.plan !== 'pro');
+    }
 
     if (!listingsContainer) return;
 
@@ -204,15 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
         '<p class="dashboard-empty">Aún no has publicado nada. <a href="/publish">Publica tu primer anuncio gratis →</a></p>';
       return;
     }
-
     renderListings(listings, listingsContainer);
   };
-
-  function applyOwnerUI() {
-    if (metricPlan)  metricPlan.textContent  = 'Pro';
-    if (metricFree)  metricFree.textContent  = 'Ilimitadas';
-    if (upgradeSection) upgradeSection.classList.add('hidden');
-  }
 
   auth.onAuthStateChanged((user) => {
     if (!user) { window.location.href = '/login'; return; }
@@ -220,11 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadDashboard(user).catch(err => {
       console.error(err);
-      if (user.email === OWNER_EMAIL) applyOwnerUI();
-      else {
-        if (metricFree)  metricFree.textContent  = String(FREE_LIMIT);
-        if (metricPlan)  metricPlan.textContent  = 'Gratis';
-        if (metricCount) metricCount.textContent = '0';
+      if (user.email === OWNER_EMAIL) {
+        applyOwnerUI();
+      } else {
+        if (metricFree)        metricFree.textContent  = '3';
+        if (metricPlan)        metricPlan.textContent  = 'Gratis';
+        if (metricCount)       metricCount.textContent = '0';
         if (listingsContainer) listingsContainer.innerHTML =
           '<p class="dashboard-empty">Error al cargar el panel. <a href="" onclick="location.reload();return false;">Recarga la página →</a></p>';
       }
