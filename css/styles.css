@@ -29,14 +29,14 @@ nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
+    /* No max-width/margin centering — logo stays flush left */
 }
 
 .logo {
     display: flex;
+    flex-direction: row;          /* text LEFT, image RIGHT */
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.5rem;
     text-decoration: none;
     color: #e8c97a;
     font-size: 1.4rem;
@@ -44,6 +44,16 @@ nav {
     letter-spacing: 0.01em;
     line-height: 1;
     flex-shrink: 0;
+}
+
+.logo span {
+    /* Keeps MercadoCR text on the left */
+    order: 0;
+}
+
+.logo-img {
+    /* Image renders on the right of the text */
+    order: 1;
 }
 
 .logo:hover {
