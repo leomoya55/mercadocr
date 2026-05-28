@@ -34,9 +34,29 @@ nav {
 }
 
 .logo {
-    font-size: 1.8rem;
-    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    text-decoration: none;
     color: #e8c97a;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.logo:hover {
+    color: #f5dfa0;
+}
+
+.logo-img {
+    width: 40px;
+    height: 34px;
+    object-fit: contain;
+    flex-shrink: 0;
+    /* Drop-shadow makes the gold cart pop against the dark header */
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
 }
 
 nav ul {

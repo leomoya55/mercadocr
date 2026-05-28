@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 90" role="img" aria-label="MercadoCR">
+  <defs>
+    <!--
+      Clip path = cart basket outline.
+      Wider at top (x 9–91), converges slightly at bottom (x 19–77).
+      Bottom corners are rounded with quadratic curves.
+    -->
+    <clipPath id="bcl">
+      <path d="M9,4 h82 l-7,62 q-1,5-6,5 H20 q-5,0-6,-5 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- ── Costa Rica flag stripes (clipped to basket shape) ─────────────── -->
+  <g clip-path="url(#bcl)">
+    <!-- Blue left -->
+    <rect x="0"  y="0" width="38" height="76" fill="#003DA5"/>
+    <!--
+      White separator — curved like the flag is billowing.
+      Left edge bows left, right edge bows right, making the strip
+      appear to wave slightly (matches the original logo aesthetic).
+    -->
+    <path d="M38,0 Q32,38 36,76 H42 Q46,38 42,0 Z" fill="#ffffff"/>
+    <!-- Red center -->
+    <path d="M42,0 Q46,38 42,76 H66 Q62,38 66,0 Z" fill="#CE1126"/>
+    <!-- White separator -->
+    <path d="M66,0 Q62,38 66,76 H72 Q76,38 72,0 Z" fill="#ffffff"/>
+    <!-- Blue right -->
+    <rect x="72" y="0" width="36" height="76" fill="#003DA5"/>
+  </g>
+
+  <!-- ── Cart frame (gold) ─────────────────────────────────────────────── -->
+
+  <!-- Basket outline -->
+  <path d="M9,4 h82 l-7,62 q-1,5-6,5 H20 q-5,0-6,-5 Z"
+        fill="none" stroke="#C8952C" stroke-width="7" stroke-linejoin="round"/>
+
+  <!-- Handle: arc from top-right corner curving right then down -->
+  <path d="M91,5 Q105,4 106,20 L106,44"
+        fill="none" stroke="#C8952C" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bottom axle bar connecting wheels -->
+  <line x1="23" y1="71" x2="77" y2="71"
+        stroke="#C8952C" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Left wheel -->
+  <circle cx="31" cy="82" r="8" fill="#C8952C"/>
+
+  <!-- Right wheel -->
+  <circle cx="69" cy="82" r="8" fill="#C8952C"/>
+</svg>
