@@ -211,7 +211,46 @@ async function runStartupMigrations() {
       console.log(`[migration] Deleted ${deleted.deletedCount} corrupted user doc(s) (null/missing firebaseUid)`);
     }
 
-    // 4. Clear auto-featured listings (one-time, tracked so it never re-runs).
+    // 4. Deduplicate user documents by email (one-time).
+    //
+    //    During the E11000 bug period, failed upserts sometimes produced multiple
+    //    user documents for the same email with different firebaseUid values.
+    //    For each duplicated email we keep the most complete record (has a name,
+    //    newest createdAt) and delete the rest.
+    //
+    const migrationsCol = mongoose.connection.collection('_migrations');
+    const dedupRan = await migrationsCol.findOne({ name: 'dedup_users_by_email_v1' });
+    if (!dedupRan) {
+      const dups = await col.aggregate([
+        { $group: {
+            _id:  '$email',
+            count: { $sum: 1 },
+            docs: { $push: { id: '$_id', nombre: '$nombre', createdAt: '$createdAt' } },
+        }},
+        { $match: { count: { $gt: 1 }, _id: { $nin: [null, ''] } } },
+      ]).toArray();
+
+      let totalRemoved = 0;
+      for (const dup of dups) {
+        // Sort: has nombre first, then newest createdAt — keep index 0
+        const sorted = dup.docs.sort(function (a, b) {
+          const aN = a.nombre ? 1 : 0;
+          const bN = b.nombre ? 1 : 0;
+          if (aN !== bN) return bN - aN;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        const deleteIds = sorted.slice(1).map(function (d) { return d.id; });
+        if (deleteIds.length) {
+          await col.deleteMany({ _id: { $in: deleteIds } });
+          totalRemoved += deleteIds.length;
+          console.log(`[migration] Removed ${deleteIds.length} duplicate(s) for email: ${dup._id}`);
+        }
+      }
+      await migrationsCol.insertOne({ name: 'dedup_users_by_email_v1', ranAt: new Date() });
+      if (totalRemoved === 0) console.log('[migration] dedup_users_by_email_v1: no duplicates found');
+    }
+
+    // 5. Clear auto-featured listings (one-time, tracked so it never re-runs).
     //
     //    Old versions of the code set featured:true automatically for Pro plan
     //    users. That logic was removed — featured is now a manual admin action
@@ -220,7 +259,6 @@ async function runStartupMigrations() {
     //    We track completion in a _migrations collection so this step is skipped
     //    on subsequent cold starts and never touches listings the admin
     //    intentionally features via the admin panel in the future.
-    const migrationsCol = mongoose.connection.collection('_migrations');
     const alreadyRan = await migrationsCol.findOne({ name: 'clear_auto_featured_v1' });
     if (!alreadyRan) {
       const listingsCol = mongoose.connection.collection('listings');

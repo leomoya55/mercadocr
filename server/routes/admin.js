@@ -92,7 +92,7 @@ router.get('/listings', async (req, res) => {
     if (req.query.q)      filter.$text  = { $search: req.query.q };
 
     const [listings, total] = await Promise.all([
-      Listing.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Listing.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).select('-viewedBy').lean(),
       Listing.countDocuments(filter),
     ]);
 

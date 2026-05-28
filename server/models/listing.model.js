@@ -17,6 +17,7 @@ const listingSchema = new mongoose.Schema({
   featured:    { type: Boolean, default: false },
   hidden:      { type: Boolean, default: false }, // Admin moderation flag
   views:       { type: Number, default: 0 },
+  viewedBy:    [{ type: String }],               // Firebase UIDs — one entry per unique viewer
   status:      { type: String, enum: ['active', 'sold'], default: 'active' },
 }, {
   timestamps: true,

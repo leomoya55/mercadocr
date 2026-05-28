@@ -36,6 +36,23 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
+  // ── Unique authenticated view tracking ──────────────────────────────────────
+  // Fires once when auth state resolves. Backend atomically enforces all rules:
+  //   - guests never count (no token → request never sent)
+  //   - owner viewing own listing → server filter won't match → no count
+  //   - same user revisiting → viewedBy already contains their UID → no count
+  //   - page refresh = no extra count ever
+  // No localStorage. No client-side deduplication. All logic is server-side.
+  auth.onAuthStateChanged(function (user) {
+    if (!user || !productId) return;
+    user.getIdToken().then(function (token) {
+      fetch(API_BASE_URL + '/api/listings/' + productId + '/view', {
+        method:  'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+      }).catch(function () {}); // fire-and-forget — never block the page
+    }).catch(function () {});
+  });
+
   fetch(API_BASE_URL + '/api/listings/' + productId)
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);

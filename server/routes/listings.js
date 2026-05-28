@@ -70,8 +70,13 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // Build projection: always exclude viewedBy (internal array, never sent to frontend).
+    // When using text search, also include the relevance score as a computed field.
+    const projection = { viewedBy: 0 };
+    if (q && q.trim()) projection.score = { $meta: 'textScore' };
+
     let [listings, total] = await Promise.all([
-      Listing.find(filter, q && q.trim() ? { score: { $meta: 'textScore' } } : {})
+      Listing.find(filter, projection)
         .sort(sortObj)
         .skip(skip)
         .limit(limit)
@@ -127,19 +132,62 @@ router.get('/', async (req, res) => {
 router.get('/user/:uid', (req, res) => {
   Listing.find({ author: req.params.uid })
     .sort({ status: 1, createdAt: -1 }) // active first, then sold
+    .select('-viewedBy')
     .then(listings => res.json(listings))
     .catch(err => res.status(400).json('Error: ' + err));
 });
 
-// GET /:id — single listing with seller info (increments view counter)
+/**
+ * POST /:id/view — unique authenticated view tracking.
+ *
+ * Rules (all enforced atomically by the MongoDB filter, not by application logic):
+ *   - Requires a valid Firebase JWT → guests never count.
+ *   - Owner viewing their own listing → filter won't match → counted: false.
+ *   - Already viewed → viewedBy contains uid → filter won't match → counted: false.
+ *   - Hidden or non-active listing → filter won't match → counted: false.
+ *   - First view by a new authenticated user → $inc views + $addToSet uid → counted: true.
+ *
+ * $addToSet instead of $push: guarantees array-level uniqueness at the MongoDB layer,
+ * providing a second safety net against any edge-case concurrency or race conditions
+ * that bypass the filter (e.g. two simultaneous requests with the same UID).
+ *
+ * updateOne returns no document → viewedBy never enters Node.js memory.
+ * A follow-up findById fetches only the `views` Number for the response.
+ *
+ * Returns: { counted: boolean, views: number }
+ */
+router.post('/:id/view', verifyToken, async (req, res) => {
+  try {
+    const result = await Listing.updateOne(
+      {
+        _id:      req.params.id,
+        status:   'active',            // sold listings do not gain views
+        hidden:   { $ne: true },       // hidden listing   → no count
+        author:   { $ne: req.uid },    // owner self-view  → no count
+        viewedBy: { $ne: req.uid },    // already viewed   → no count
+      },
+      {
+        $inc:      { views: 1 },
+        $addToSet: { viewedBy: req.uid }, // array-level uniqueness guarantee
+      }
+    );
+
+    const counted = result.modifiedCount === 1;
+
+    // Fetch only the view count — viewedBy never enters Node memory
+    const doc = await Listing.findById(req.params.id).select('views').lean();
+
+    res.json({ counted, views: doc ? doc.views : 0 });
+  } catch (err) {
+    console.error('[POST /listings/:id/view]', err.message);
+    res.json({ counted: false, views: 0 }); // never fail the page over a view count
+  }
+});
+
+// GET /:id — single listing with seller info (does NOT increment views)
 router.get('/:id', async (req, res) => {
   try {
-    // Increment views atomically, return updated doc
-    const listing = await Listing.findByIdAndUpdate(
-      req.params.id,
-      { $inc: { views: 1 } },
-      { new: true }
-    ).lean();
+    const listing = await Listing.findById(req.params.id).select('-viewedBy').lean();
     if (!listing) return res.status(404).json('Listing not found');
     // Hidden listings are only visible in the admin panel
     if (listing.hidden) return res.status(404).json('Listing not found');
