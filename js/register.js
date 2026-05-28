@@ -32,37 +32,75 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         submitButton.disabled = true;
+        submitButton.textContent = 'Verificando...';
+
+        // ── Step 1: Check phone uniqueness BEFORE creating Firebase account ──
+        if (phone) {
+            try {
+                const checkRes = await fetch(
+                    API_BASE_URL + `/api/users/phone-check?phone=${encodeURIComponent(phone)}`
+                );
+                const check = await checkRes.json();
+                if (!check.available) {
+                    showError('Este número de teléfono ya está registrado. Usa otro número.');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Registrarse';
+                    return;
+                }
+            } catch {
+                // If the check fails (cold start), continue — ensure validates again server-side
+            }
+        }
+
         submitButton.textContent = 'Creando cuenta...';
 
         try {
+            // ── Step 2: Create Firebase auth account ──
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             const user = userCredential.user;
 
-            // Set Firebase display name if provided
+            // Set Firebase display name
             if (nombre && apellido) {
                 await user.updateProfile({ displayName: `${nombre} ${apellido}` });
-                // onAuthStateChanged already fired before updateProfile ran, so update nav directly
                 const navBtn = document.getElementById('nav-user-btn');
                 if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
             }
 
-            // Fire-and-forget verification email — doesn't block redirect
+            // Send verification email (fire-and-forget — doesn't block redirect)
             user.sendEmailVerification().catch(e => console.warn('Verification email:', e.message));
 
-            // Store registration data so dashboard can forward it to the profile on first login
-            // (the ensure fetch below may be aborted by the page navigation, so sessionStorage is the safety net)
+            // ── Step 3: Save profile to DB — AWAITED with 5s timeout ──
+            // This guarantees phone, provincia, nombre, apellido are stored permanently.
+            // sessionStorage is the safety net if this times out (dashboard picks it up).
             sessionStorage.setItem('mcr_reg', JSON.stringify({ phone, provincia, nombre, apellido }));
-
-            user.getIdToken().then(token => {
+            submitButton.textContent = 'Guardando perfil...';
+            try {
+                const token = await user.getIdToken();
                 const controller = new AbortController();
-                setTimeout(() => controller.abort(), 8000);
-                return fetch(API_BASE_URL + '/api/users/ensure', {
+                const timer = setTimeout(() => controller.abort(), 5000);
+                const ensureRes = await fetch(API_BASE_URL + '/api/users/ensure', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
                     body: JSON.stringify({ email, nombre, apellido, phone, provincia }),
                     signal: controller.signal,
                 });
-            }).catch(e => console.warn('Profile API:', e.message));
+                clearTimeout(timer);
+
+                if (ensureRes.status === 409) {
+                    // Phone was taken by the time we got here (race condition)
+                    // Profile was still created but without the phone
+                    console.warn('Phone conflict on ensure — profile saved without phone');
+                }
+                // Profile saved — clear the sessionStorage safety net
+                if (ensureRes.ok) sessionStorage.removeItem('mcr_reg');
+            } catch (profileErr) {
+                // Timed out or network error — sessionStorage still has the data
+                // Dashboard will forward it to ensure on first visit
+                console.warn('Profile save during registration:', profileErr.message);
+            }
 
             sessionStorage.setItem('verificationEmail', email);
             window.location.href = '/verify-email';

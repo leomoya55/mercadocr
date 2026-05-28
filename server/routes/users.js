@@ -9,6 +9,18 @@ function isOwner(email) {
   return e === 'leomoyawr300@gmail.com' || (fromEnv && e === fromEnv);
 }
 
+// Public phone availability check — no auth, returns only {available: bool}
+router.get('/phone-check', async (req, res) => {
+  try {
+    const phone = (req.query.phone || '').trim();
+    if (!phone) return res.json({ available: true });
+    const exists = await User.findOne({ phone }).select('_id').lean();
+    res.json({ available: !exists });
+  } catch {
+    res.json({ available: true }); // fail open — server validates again in ensure
+  }
+});
+
 // Public seller info — no auth needed
 router.get('/public/:uid', async (req, res) => {
   const user = await User.findOne({ firebaseUid: req.params.uid })
@@ -30,12 +42,18 @@ router.post('/ensure', verifyToken, async (req, res) => {
     const isFounder = isOwner(req.email) || isOwner(email);
 
     if (!user) {
+      // Check phone uniqueness before creating
+      const cleanPhone = (phone || '').trim();
+      if (cleanPhone) {
+        const phoneConflict = await User.findOne({ phone: cleanPhone }).select('_id').lean();
+        if (phoneConflict) return res.status(409).json({ error: 'Este número ya está registrado por otra cuenta.' });
+      }
       user = await User.create({
         firebaseUid: uid,
         email,
         nombre: nombre || '',
         apellido: apellido || '',
-        phone: phone || '',
+        phone: cleanPhone,
         provincia: provincia || '',
         plan: isFounder ? 'pro' : 'free',
       });
