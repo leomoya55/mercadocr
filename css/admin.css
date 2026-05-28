@@ -57,6 +57,32 @@
   margin-top: 0.4rem;
 }
 
+.stat-hint {
+  font-size: 0.68rem;
+  color: #555;
+  margin-top: 0.35rem;
+  transition: color 0.15s;
+}
+
+/* Clickable stat cards */
+.stat-card[data-goto] {
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+
+.stat-card[data-goto]:hover {
+  border-color: #e8c97a;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+.stat-card[data-goto]:hover .stat-hint { color: #e8c97a; }
+
+.stat-card[data-goto]:focus-visible {
+  outline: 2px solid #e8c97a;
+  outline-offset: 2px;
+}
+
 /* ─── Tabs ──────────────────────────────────────────────────────────────────── */
 
 .admin-tabs {
@@ -254,6 +280,51 @@
 .admin-pagination .page-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* ─── Plan select inline ────────────────────────────────────────────────────── */
+
+.plan-select-inline {
+  padding: 0.25rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #ccc;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.plan-select-inline:focus { outline: 1px solid #e8c97a; }
+
+/* ─── Admin link ────────────────────────────────────────────────────────────── */
+
+.admin-link { color: #e8c97a; text-decoration: none; }
+.admin-link:hover { text-decoration: underline; }
+
+/* ─── Secondary small button ────────────────────────────────────────────────── */
+
+.btn-secondary-sm {
+  padding: 0.28rem 0.65rem;
+  border-radius: 5px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #888;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.btn-secondary-sm:hover { border-color: #888; color: #ccc; }
+
+/* ─── Author filter label ───────────────────────────────────────────────────── */
+
+.admin-author-label {
+  font-size: 0.82rem;
+  color: #e8c97a;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 /* ─── Responsive ────────────────────────────────────────────────────────────── */

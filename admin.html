@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin — MercadoCR</title>
-    <!-- No robots indexing for the admin panel -->
     <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/admin.css">
@@ -32,13 +31,43 @@
         <div id="admin-content" class="hidden">
             <h2>Panel de administración</h2>
 
-            <!-- Stats row -->
+            <!-- Stat cards — click any to jump to the relevant tab with filter applied -->
             <section class="admin-stats" id="admin-stats">
-                <div class="stat-card"><div class="stat-val" id="stat-listings-active">—</div><div class="stat-label">Anuncios activos</div></div>
-                <div class="stat-card"><div class="stat-val" id="stat-listings-hidden">—</div><div class="stat-label">Anuncios ocultos</div></div>
-                <div class="stat-card"><div class="stat-val" id="stat-users-total">—</div><div class="stat-label">Usuarios</div></div>
-                <div class="stat-card"><div class="stat-val" id="stat-users-pro">—</div><div class="stat-label">Usuarios Pro</div></div>
-                <div class="stat-card"><div class="stat-val" id="stat-reports-pending">—</div><div class="stat-label">Reportes pendientes</div></div>
+                <div class="stat-card" role="button" tabindex="0"
+                     data-goto="listings" data-goto-status="active" data-goto-hidden="false"
+                     title="Ver anuncios activos">
+                    <div class="stat-val" id="stat-listings-active">—</div>
+                    <div class="stat-label">Anuncios activos</div>
+                    <div class="stat-hint">→ ver lista</div>
+                </div>
+                <div class="stat-card" role="button" tabindex="0"
+                     data-goto="listings" data-goto-hidden="true"
+                     title="Ver anuncios ocultos">
+                    <div class="stat-val" id="stat-listings-hidden">—</div>
+                    <div class="stat-label">Anuncios ocultos</div>
+                    <div class="stat-hint">→ ver lista</div>
+                </div>
+                <div class="stat-card" role="button" tabindex="0"
+                     data-goto="users"
+                     title="Ver todos los usuarios">
+                    <div class="stat-val" id="stat-users-total">—</div>
+                    <div class="stat-label">Usuarios</div>
+                    <div class="stat-hint">→ ver lista</div>
+                </div>
+                <div class="stat-card" role="button" tabindex="0"
+                     data-goto="users" data-goto-plan="pro"
+                     title="Ver usuarios Pro">
+                    <div class="stat-val" id="stat-users-pro">—</div>
+                    <div class="stat-label">Usuarios Pro</div>
+                    <div class="stat-hint">→ ver lista</div>
+                </div>
+                <div class="stat-card" role="button" tabindex="0"
+                     data-goto="reports" data-goto-status="pending"
+                     title="Ver reportes pendientes">
+                    <div class="stat-val" id="stat-reports-pending">—</div>
+                    <div class="stat-label">Reportes pendientes</div>
+                    <div class="stat-hint">→ ver lista</div>
+                </div>
             </section>
 
             <!-- Tabs -->
@@ -63,7 +92,11 @@
                         <option value="true">Ocultos</option>
                     </select>
                     <button id="admin-listing-search" type="button">Buscar</button>
+                    <button id="admin-listing-reset" type="button" class="btn-secondary-sm">Limpiar</button>
                 </div>
+                <!-- Hidden field — set by "Ver anuncios" on a user row -->
+                <input type="hidden" id="admin-listing-author" value="">
+                <div id="admin-listing-author-label" class="admin-author-label hidden"></div>
                 <div id="admin-listings-table" class="admin-table-wrap">
                     <p class="admin-loading">Cargando...</p>
                 </div>
@@ -72,6 +105,17 @@
 
             <!-- Users panel -->
             <section class="admin-panel" id="tab-users">
+                <div class="admin-toolbar">
+                    <input type="search" id="admin-user-q" placeholder="Buscar por nombre o email...">
+                    <select id="admin-user-plan">
+                        <option value="">Todos los planes</option>
+                        <option value="free">Gratis</option>
+                        <option value="basic">Basic</option>
+                        <option value="pro">Pro</option>
+                    </select>
+                    <button id="admin-user-search" type="button">Buscar</button>
+                    <button id="admin-user-reset" type="button" class="btn-secondary-sm">Limpiar</button>
+                </div>
                 <div id="admin-users-table" class="admin-table-wrap">
                     <p class="admin-loading">Cargando...</p>
                 </div>

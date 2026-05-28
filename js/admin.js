@@ -4,7 +4,7 @@
  * Security model:
  *   - Frontend: only renders the panel when Firebase Auth user email === OWNER_EMAIL.
  *   - Backend: every /api/admin/* request independently re-checks isOwner(email).
- *   - Frontend hiding is a UX courtesy only. The backend is the authoritative gate.
+ *   - Frontend hiding is UX only. The backend is the authoritative gate.
  *
  * Requires: config.js (escapeHtml, API_BASE_URL), ui.js (Toast), auth-redirect.js (authFetch)
  */
@@ -31,17 +31,68 @@
   });
 
   // ─── Tab switching ────────────────────────────────────────────────────────
+  function switchToTab(tabName) {
+    document.querySelectorAll('.admin-tab').forEach(function (b) { b.classList.remove('active'); });
+    document.querySelectorAll('.admin-panel').forEach(function (p) { p.classList.remove('active'); });
+
+    var btn   = document.querySelector('.admin-tab[data-tab="' + tabName + '"]');
+    var panel = document.getElementById('tab-' + tabName);
+    if (btn)   btn.classList.add('active');
+    if (panel) panel.classList.add('active');
+
+    // Mark as loaded so lazy-init knows it already ran
+    if (btn) btn.dataset.loaded = '1';
+  }
+
   document.querySelectorAll('.admin-tab').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      document.querySelectorAll('.admin-tab').forEach(function (b) { b.classList.remove('active'); });
-      document.querySelectorAll('.admin-panel').forEach(function (p) { p.classList.remove('active'); });
-      btn.classList.add('active');
-      var panel = document.getElementById('tab-' + btn.dataset.tab);
-      if (panel) panel.classList.add('active');
+      switchToTab(btn.dataset.tab);
+      if (btn.dataset.tab === 'users'   && !btn.dataset.loaded) { loadUsers(1); }
+      if (btn.dataset.tab === 'reports' && !btn.dataset.loaded) { loadReports(1); }
+      btn.dataset.loaded = '1';
+    });
+  });
 
-      // Lazy-load tab content on first activation
-      if (btn.dataset.tab === 'users'   && !btn.dataset.loaded) { btn.dataset.loaded = '1'; loadUsers(1); }
-      if (btn.dataset.tab === 'reports' && !btn.dataset.loaded) { btn.dataset.loaded = '1'; loadReports(1); }
+  // ─── Stat card click → jump to tab with pre-applied filter ───────────────
+  document.querySelectorAll('.stat-card[data-goto]').forEach(function (card) {
+    function activate() {
+      var tab    = card.dataset.goto;
+      var status = card.dataset.gotoStatus || '';
+      var hidden = card.dataset.gotoHidden || '';
+      var plan   = card.dataset.gotoPlan   || '';
+
+      switchToTab(tab);
+
+      if (tab === 'listings') {
+        var sq = document.getElementById('admin-listing-q');
+        var ss = document.getElementById('admin-listing-status');
+        var sh = document.getElementById('admin-listing-hidden');
+        var sa = document.getElementById('admin-listing-author');
+        if (sq) sq.value = '';
+        if (ss) ss.value = status;
+        if (sh) sh.value = hidden;
+        if (sa) { sa.value = ''; clearAuthorLabel(); }
+        loadListings(1);
+      }
+
+      if (tab === 'users') {
+        var uq = document.getElementById('admin-user-q');
+        var up = document.getElementById('admin-user-plan');
+        if (uq) uq.value = '';
+        if (up) up.value = plan;
+        loadUsers(1);
+      }
+
+      if (tab === 'reports') {
+        var rs = document.getElementById('admin-report-status');
+        if (rs) rs.value = status;
+        loadReports(1);
+      }
+    }
+
+    card.addEventListener('click', activate);
+    card.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
     });
   });
 
@@ -72,11 +123,13 @@
     var q      = (document.getElementById('admin-listing-q')      || {}).value || '';
     var status = (document.getElementById('admin-listing-status') || {}).value || '';
     var hidden = (document.getElementById('admin-listing-hidden') || {}).value || '';
+    var author = (document.getElementById('admin-listing-author') || {}).value || '';
 
     var qs = 'page=' + page + '&limit=20';
     if (q)      qs += '&q='      + encodeURIComponent(q);
     if (status) qs += '&status=' + encodeURIComponent(status);
     if (hidden) qs += '&hidden=' + encodeURIComponent(hidden);
+    if (author) qs += '&author=' + encodeURIComponent(author);
 
     var wrap = document.getElementById('admin-listings-table');
     if (wrap) wrap.innerHTML = '<p class="admin-loading">Cargando...</p>';
@@ -93,8 +146,46 @@
       });
   }
 
+  function clearAuthorLabel() {
+    var lbl = document.getElementById('admin-listing-author-label');
+    if (lbl) { lbl.textContent = ''; lbl.classList.add('hidden'); }
+  }
+
+  function setAuthorLabel(name) {
+    var lbl = document.getElementById('admin-listing-author-label');
+    if (!lbl) return;
+    lbl.textContent = 'Filtrando por usuario: ' + name + ' ';
+    lbl.classList.remove('hidden');
+    // Add a clear button
+    var x = document.createElement('button');
+    x.textContent = '✕ Limpiar filtro';
+    x.className = 'btn-sm';
+    x.style.marginLeft = '0.5rem';
+    x.addEventListener('click', function () {
+      var sa = document.getElementById('admin-listing-author');
+      if (sa) sa.value = '';
+      clearAuthorLabel();
+      loadListings(1);
+    });
+    lbl.appendChild(x);
+  }
+
   document.getElementById('admin-listing-search') &&
     document.getElementById('admin-listing-search').addEventListener('click', function () { loadListings(1); });
+
+  document.getElementById('admin-listing-reset') &&
+    document.getElementById('admin-listing-reset').addEventListener('click', function () {
+      var q = document.getElementById('admin-listing-q');       if (q) q.value = '';
+      var s = document.getElementById('admin-listing-status');  if (s) s.value = '';
+      var h = document.getElementById('admin-listing-hidden');  if (h) h.value = '';
+      var a = document.getElementById('admin-listing-author');  if (a) a.value = '';
+      clearAuthorLabel();
+      loadListings(1);
+    });
+
+  // Enter key on listing search input
+  var lq = document.getElementById('admin-listing-q');
+  if (lq) lq.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadListings(1); });
 
   function renderListingsTable(listings) {
     var wrap = document.getElementById('admin-listings-table');
@@ -109,17 +200,17 @@
       '</tr></thead><tbody>';
 
     listings.forEach(function (l) {
-      var hiddenBadge   = l.hidden   ? '<span class="badge-hidden">Oculto</span>'     : '';
-      var featuredBadge = l.featured ? '<span class="badge-featured">Destacado</span>' : '';
+      var hiddenBadge   = l.hidden   ? '<span class="badge-hidden">Oculto</span>'      : '—';
+      var featuredBadge = l.featured ? '<span class="badge-featured">Destacado</span>' : '—';
       html +=
-        '<tr data-id="' + escapeHtml(l._id) + '">' +
-        '<td><a href="/product?id=' + escapeHtml(l._id) + '" target="_blank" rel="noopener noreferrer" style="color:#e8c97a">' +
+        '<tr>' +
+        '<td><a href="/product?id=' + escapeHtml(l._id) + '" target="_blank" rel="noopener noreferrer" class="admin-link">' +
           escapeHtml(l.name) + '</a></td>' +
         '<td>₡' + Number(l.price).toLocaleString('es-CR') + '</td>' +
         '<td>' + escapeHtml(l.category) + '</td>' +
         '<td>' + escapeHtml(l.status) + '</td>' +
-        '<td>' + hiddenBadge   + (l.hidden   ? '' : '—') + '</td>' +
-        '<td>' + featuredBadge + (l.featured ? '' : '—') + '</td>' +
+        '<td>' + hiddenBadge   + '</td>' +
+        '<td>' + featuredBadge + '</td>' +
         '<td>' + (l.views || 0) + '</td>' +
         '<td class="admin-actions">' +
           '<button class="btn-sm" data-action="' + (l.hidden ? 'unhide' : 'hide') + '" data-id="' + escapeHtml(l._id) + '">' +
@@ -128,14 +219,13 @@
           '<button class="btn-sm" data-action="' + (l.featured ? 'unfeature' : 'feature') + '" data-id="' + escapeHtml(l._id) + '">' +
             (l.featured ? 'Quitar dest.' : 'Destacar') +
           '</button>' +
-          '<button class="btn-sm btn-danger" data-action="delete" data-id="' + escapeHtml(l._id) + '">Eliminar</button>' +
+          '<button class="btn-sm btn-danger" data-action="delete-listing" data-id="' + escapeHtml(l._id) + '">Eliminar</button>' +
         '</td></tr>';
     });
 
     html += '</tbody></table>';
     wrap.innerHTML = html;
 
-    // Delegated action handlers
     wrap.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-action]');
       if (!btn) return;
@@ -158,15 +248,15 @@
           }
         );
       }
-      if (action === 'delete') {
-        if (!confirm('¿Eliminar este anuncio definitivamente?')) return;
+      if (action === 'delete-listing') {
+        if (!confirm('¿Eliminar este anuncio definitivamente? Esta acción no se puede deshacer.')) return;
         adminDelete('/api/admin/listings/' + id, function () {
           Toast.success('Anuncio eliminado.');
           loadStats();
           loadListings(listingsPage);
         });
       }
-    }, { once: false });
+    });
   }
 
   // ─── Users ────────────────────────────────────────────────────────────────
@@ -174,10 +264,17 @@
 
   function loadUsers(page) {
     usersPage = page;
+    var q    = (document.getElementById('admin-user-q')    || {}).value || '';
+    var plan = (document.getElementById('admin-user-plan') || {}).value || '';
+
+    var qs = 'page=' + page + '&limit=20';
+    if (q)    qs += '&q='    + encodeURIComponent(q);
+    if (plan) qs += '&plan=' + encodeURIComponent(plan);
+
     var wrap = document.getElementById('admin-users-table');
     if (wrap) wrap.innerHTML = '<p class="admin-loading">Cargando...</p>';
 
-    authFetch(API_BASE_URL + '/api/admin/users?page=' + page + '&limit=20')
+    authFetch(API_BASE_URL + '/api/admin/users?' + qs)
       .then(function (r) { return r.json(); })
       .then(function (d) {
         renderUsersTable(d.users || []);
@@ -189,30 +286,108 @@
       });
   }
 
+  document.getElementById('admin-user-search') &&
+    document.getElementById('admin-user-search').addEventListener('click', function () { loadUsers(1); });
+
+  document.getElementById('admin-user-reset') &&
+    document.getElementById('admin-user-reset').addEventListener('click', function () {
+      var q = document.getElementById('admin-user-q');    if (q) q.value = '';
+      var p = document.getElementById('admin-user-plan'); if (p) p.value = '';
+      loadUsers(1);
+    });
+
+  var uq = document.getElementById('admin-user-q');
+  if (uq) uq.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadUsers(1); });
+
   function renderUsersTable(users) {
     var wrap = document.getElementById('admin-users-table');
     if (!wrap) return;
     if (!users.length) { wrap.innerHTML = '<p class="admin-loading">Sin usuarios.</p>'; return; }
 
     var html = '<table class="admin-table"><thead><tr>' +
-      '<th>Nombre</th><th>Email</th><th>Plan</th><th>Provincia</th><th>Créditos</th><th>Registrado</th>' +
+      '<th>Nombre</th><th>Email</th><th>Plan</th><th>Créditos</th><th>Provincia</th><th>Registrado</th><th>Acciones</th>' +
       '</tr></thead><tbody>';
 
     users.forEach(function (u) {
-      var name = (u.nombre || '') + ' ' + (u.apellido || '');
+      var name = ((u.nombre || '') + ' ' + (u.apellido || '')).trim() || '—';
+      var uid  = escapeHtml(u.firebaseUid || '');
       html +=
         '<tr>' +
-        '<td>' + escapeHtml(name.trim() || '—') + '</td>' +
-        '<td>' + escapeHtml(u.email || '—') + '</td>' +
-        '<td><span class="badge-plan badge-plan-' + escapeHtml(u.plan || 'free') + '">' + escapeHtml(u.plan || 'free') + '</span></td>' +
+        '<td>' + escapeHtml(name) + '</td>' +
+        '<td style="font-size:0.8rem;color:#aaa;">' + escapeHtml(u.email || '—') + '</td>' +
+        '<td>' +
+          '<select class="plan-select-inline" data-action="change-plan" data-uid="' + uid + '" data-current="' + escapeHtml(u.plan || 'free') + '">' +
+            '<option value="free"'  + (u.plan === 'free'  ? ' selected' : '') + '>Gratis</option>' +
+            '<option value="basic"' + (u.plan === 'basic' ? ' selected' : '') + '>Basic</option>' +
+            '<option value="pro"'   + (u.plan === 'pro'   ? ' selected' : '') + '>Pro</option>' +
+          '</select>' +
+        '</td>' +
+        '<td>' +
+          '<span class="credits-val">' + (u.singlePostCredits || 0) + '</span>' +
+          ' <button class="btn-sm" data-action="add-credit" data-uid="' + uid + '" title="Agregar 1 crédito">+</button>' +
+          ' <button class="btn-sm" data-action="remove-credit" data-uid="' + uid + '" title="Quitar 1 crédito">−</button>' +
+        '</td>' +
         '<td>' + escapeHtml(u.provincia || '—') + '</td>' +
-        '<td>' + (u.singlePostCredits || 0) + '</td>' +
-        '<td>' + (u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-CR') : '—') + '</td>' +
-        '</tr>';
+        '<td style="font-size:0.8rem;">' + (u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-CR') : '—') + '</td>' +
+        '<td class="admin-actions">' +
+          '<button class="btn-sm" data-action="view-listings" data-uid="' + uid + '" data-name="' + escapeHtml(name) + '">Ver anuncios</button>' +
+        '</td></tr>';
     });
 
     html += '</tbody></table>';
     wrap.innerHTML = html;
+
+    // Delegated: plan change (select → change event)
+    wrap.addEventListener('change', function (e) {
+      var sel = e.target.closest('.plan-select-inline');
+      if (!sel) return;
+      var newPlan  = sel.value;
+      var uid      = sel.dataset.uid;
+      var previous = sel.dataset.current;
+
+      if (!confirm('¿Cambiar plan de este usuario a "' + newPlan + '"?')) {
+        sel.value = previous; // revert
+        return;
+      }
+
+      adminPost('/api/admin/users/' + uid + '/plan', { plan: newPlan }, function () {
+        sel.dataset.current = newPlan;
+        Toast.success('Plan actualizado a ' + newPlan + '.');
+        loadStats();
+      });
+    });
+
+    // Delegated: button actions
+    wrap.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      var action = btn.dataset.action;
+      var uid    = btn.dataset.uid;
+
+      if (action === 'add-credit' || action === 'remove-credit') {
+        var delta = action === 'add-credit' ? 1 : -1;
+        adminPost('/api/admin/users/' + uid + '/credits', { delta: delta }, function (d) {
+          // Update the displayed credits value in the same row
+          var row = btn.closest('tr');
+          var cv  = row && row.querySelector('.credits-val');
+          if (cv && d.credits != null) cv.textContent = d.credits;
+          Toast.success(delta > 0 ? 'Crédito agregado.' : 'Crédito eliminado.');
+        });
+      }
+
+      if (action === 'view-listings') {
+        var name = btn.dataset.name || uid;
+        switchToTab('listings');
+        var authorInput = document.getElementById('admin-listing-author');
+        if (authorInput) authorInput.value = uid;
+        setAuthorLabel(name);
+        // Clear other filters so only this user's listings show
+        var q = document.getElementById('admin-listing-q');       if (q) q.value = '';
+        var s = document.getElementById('admin-listing-status');  if (s) s.value = '';
+        var h = document.getElementById('admin-listing-hidden');  if (h) h.value = '';
+        loadListings(1);
+      }
+    });
   }
 
   // ─── Reports ──────────────────────────────────────────────────────────────
@@ -260,20 +435,20 @@
       var listingName = r.listingId ? (r.listingId.name || '—') : '(eliminado)';
       var listingId   = r.listingId ? r.listingId._id : null;
       html +=
-        '<tr data-report-id="' + escapeHtml(r._id) + '">' +
+        '<tr>' +
         '<td>' +
           (listingId
-            ? '<a href="/product?id=' + escapeHtml(listingId) + '" target="_blank" rel="noopener noreferrer" style="color:#e8c97a">' + escapeHtml(listingName) + '</a>'
+            ? '<a href="/product?id=' + escapeHtml(listingId) + '" target="_blank" rel="noopener noreferrer" class="admin-link">' + escapeHtml(listingName) + '</a>'
             : escapeHtml(listingName)) +
         '</td>' +
         '<td>' + escapeHtml(REASON_LABELS[r.reason] || r.reason) + '</td>' +
         '<td><span class="badge-report-status badge-report-' + escapeHtml(r.status) + '">' + escapeHtml(r.status) + '</span></td>' +
-        '<td>' + new Date(r.createdAt).toLocaleDateString('es-CR') + '</td>' +
+        '<td style="font-size:0.8rem;">' + new Date(r.createdAt).toLocaleDateString('es-CR') + '</td>' +
         '<td class="admin-actions">' +
           (r.status === 'pending'
             ? '<button class="btn-sm" data-action="reviewed" data-id="' + escapeHtml(r._id) + '">Revisar</button>' +
               '<button class="btn-sm" data-action="dismissed" data-id="' + escapeHtml(r._id) + '">Descartar</button>' +
-              '<button class="btn-sm btn-danger" data-action="actioned" data-id="' + escapeHtml(r._id) + '">Con acción</button>'
+              '<button class="btn-sm btn-danger" data-action="actioned" data-id="' + escapeHtml(r._id) + '">Actuar</button>'
             : '—') +
         '</td></tr>';
     });
@@ -284,14 +459,12 @@
     wrap.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-action]');
       if (!btn) return;
-      var action = btn.dataset.action;
-      var id     = btn.dataset.id;
-      adminPost('/api/admin/reports/' + id + '/' + action, {}, function () {
+      adminPost('/api/admin/reports/' + btn.dataset.id + '/' + btn.dataset.action, {}, function () {
         Toast.success('Reporte actualizado.');
         loadStats();
         loadReports(reportsPage);
       });
-    }, { once: false });
+    });
   }
 
   // ─── Pagination ───────────────────────────────────────────────────────────
@@ -353,7 +526,7 @@
     });
   }
 
-  // Logout link
+  // Logout
   var logoutBtn = document.getElementById('nav-logout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function () {

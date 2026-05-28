@@ -76,7 +76,7 @@ router.get('/stats', async (req, res) => {
 
 /**
  * GET /api/admin/listings
- * Query params: page, limit, status, hidden (true/false), q (search by name)
+ * Query params: page, limit, status, hidden (true/false), q, author (firebaseUid)
  */
 router.get('/listings', async (req, res) => {
   try {
@@ -88,7 +88,8 @@ router.get('/listings', async (req, res) => {
     if (req.query.status) filter.status = req.query.status;
     if (req.query.hidden === 'true')  filter.hidden = true;
     if (req.query.hidden === 'false') filter.hidden = { $ne: true };
-    if (req.query.q) filter.$text = { $search: req.query.q };
+    if (req.query.author) filter.author = req.query.author;
+    if (req.query.q)      filter.$text  = { $search: req.query.q };
 
     const [listings, total] = await Promise.all([
       Listing.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
@@ -159,22 +160,80 @@ router.delete('/listings/:id', async (req, res) => {
 
 /**
  * GET /api/admin/users
- * Query params: page, limit
+ * Query params: page, limit, plan (free|basic|pro), q (search name/email)
  */
 router.get('/users', async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page)  || 1);
     const limit = Math.min(50, parseInt(req.query.limit) || 20);
     const skip  = (page - 1) * limit;
+    const filter = {};
+
+    if (req.query.plan) filter.plan = req.query.plan;
+    if (req.query.q) {
+      const rx = new RegExp(req.query.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ nombre: rx }, { apellido: rx }, { email: rx }];
+    }
 
     const [users, total] = await Promise.all([
-      User.find().sort({ createdAt: -1 }).skip(skip).limit(limit).select('-__v').lean(),
-      User.countDocuments(),
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).select('-__v').lean(),
+      User.countDocuments(filter),
     ]);
 
     res.json({ users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (err) {
     console.error('[GET /admin/users]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:uid/plan   body: { plan: 'free'|'basic'|'pro' }
+ * Manually set a user's plan (e.g. manually grant Pro).
+ */
+router.post('/users/:uid/plan', async (req, res) => {
+  try {
+    const valid = ['free', 'basic', 'pro'];
+    const { plan } = req.body;
+    if (!valid.includes(plan)) {
+      return res.status(400).json({ error: 'Invalid plan', valid });
+    }
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: req.params.uid },
+      { $set: { plan } },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, plan: user.plan });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:uid/credits   body: { delta: 1 | -1 }
+ * Increment or decrement a user's singlePostCredits.
+ */
+router.post('/users/:uid/credits', async (req, res) => {
+  try {
+    const delta = parseInt(req.body.delta) || 0;
+    if (delta === 0) return res.status(400).json({ error: 'delta must be non-zero' });
+
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: req.params.uid },
+      { $inc: { singlePostCredits: delta } },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Clamp to 0 if we went negative
+    if (user.singlePostCredits < 0) {
+      await User.updateOne({ firebaseUid: req.params.uid }, { $set: { singlePostCredits: 0 } });
+      user.singlePostCredits = 0;
+    }
+
+    res.json({ success: true, credits: user.singlePostCredits });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
