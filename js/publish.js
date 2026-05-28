@@ -13,6 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const startCheckout = async (type, btn) => {
     const user = auth.currentUser;
     if (!user) { window.location.href = '/login'; return; }
+
+    // Friendly guard: don't start checkout if already on this plan
+    const cached = UserStore.current;
+    if (type !== 'single' && cached?.user?.plan === type) {
+      const label = type === 'pro' ? 'Pro' : 'Basic';
+      alert(`¡Ya tienes el plan ${label} activo! No necesitas volver a comprarlo.`);
+      return;
+    }
+
     const originalText = btn.textContent;
     try {
       btn.disabled = true;
@@ -21,9 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         body: JSON.stringify({ type }),
       });
-      const session = await response.json();
-      if (session.url) {
-        window.location.href = session.url;
+      const data = await response.json();
+
+      if (response.status === 400 && data.error === 'already_on_plan') {
+        alert(data.message || '¡Ya tienes este plan activo!');
+        btn.disabled = false;
+        btn.textContent = originalText;
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
       } else {
         btn.disabled = false;
         btn.textContent = originalText;

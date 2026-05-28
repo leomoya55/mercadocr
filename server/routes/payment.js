@@ -2,13 +2,24 @@ const router = require('express').Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/user.model');
 const { verifyToken } = require('../middleware/auth');
+const { ensureUser }  = require('../middleware/ensureUser');
 
-// Create checkout session — auth required
-router.post('/create-checkout-session', verifyToken, async (req, res) => {
-  const uid = req.uid;
+// Create checkout session — auth + ensureUser so req.dbUser.plan is available
+router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res) => {
+  const uid  = req.uid;
+  const user = req.dbUser;
   const { type } = req.body;
   if (!type) return res.status(400).json({ error: 'Missing type' });
   if (!['single', 'basic', 'pro'].includes(type)) return res.status(400).json({ error: 'Invalid payment type' });
+
+  // Guard: reject if the user already has the requested subscription plan
+  if (type !== 'single' && user.plan === type) {
+    const label = type === 'pro' ? 'Pro' : 'Basic';
+    return res.status(400).json({
+      error:   'already_on_plan',
+      message: `Ya tienes el plan ${label} activo.`,
+    });
+  }
 
   try {
     // Single post: one-time ₡500 payment

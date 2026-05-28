@@ -224,6 +224,14 @@ document.addEventListener('DOMContentLoaded', () => {
     upgradeButton.addEventListener('click', async () => {
       const user = auth.currentUser;
       if (!user) { window.location.href = '/login'; return; }
+
+      // Friendly guard: don't start checkout if already Pro
+      const cached = UserStore.current;
+      if (cached?.user?.plan === 'pro') {
+        alert('¡Ya tienes el plan Pro activo! No necesitas volver a comprarlo.');
+        return;
+      }
+
       try {
         upgradeButton.disabled = true;
         upgradeButton.textContent = 'Procesando...';
@@ -231,9 +239,17 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'POST',
           body: JSON.stringify({ type: 'pro' }),
         });
-        const session = await response.json();
-        if (session.url) {
-          window.location.href = session.url;
+        const data = await response.json();
+
+        if (response.status === 400 && data.error === 'already_on_plan') {
+          alert(data.message || '¡Ya tienes el plan Pro activo!');
+          upgradeButton.disabled = false;
+          upgradeButton.textContent = 'Hacerme Pro';
+          return;
+        }
+
+        if (data.url) {
+          window.location.href = data.url;
         } else {
           alert('Error al iniciar el pago.');
           upgradeButton.disabled = false;
