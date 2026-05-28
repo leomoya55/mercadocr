@@ -80,13 +80,14 @@ router.get('/', async (req, res) => {
     ]);
 
     // ── Fill in missing contact/provincia from the seller's current profile ───
-    // Listings created before the registration fix may have contact='' or
-    // provincia=''. One batch User lookup covers all authors on this page —
-    // no N+1 queries. We never overwrite a field that already has a value.
-    const missingContact  = listings.some(l => !l.contact);
-    const missingProvincia = listings.some(l => !l.provincia);
+    // Old listings may have contact='' or contact=email (pre-fix fallback).
+    // We validate contact as a phone number (≥8 digits after stripping non-digits).
+    // One batch User lookup covers all authors on this page — no N+1 queries.
+    const isPhone = str => String(str || '').replace(/\D/g, '').length >= 8;
 
-    if (missingContact || missingProvincia) {
+    const needsSync = listings.some(l => !l.provincia || !isPhone(l.contact));
+
+    if (needsSync) {
       const authorUids = [...new Set(listings.map(l => l.author))];
       const sellers = await User
         .find({ firebaseUid: { $in: authorUids } })
@@ -100,8 +101,9 @@ router.get('/', async (req, res) => {
         if (!s) return l;
         return {
           ...l,
-          contact:   l.contact   || s.phone     || '',
-          provincia: l.provincia || s.provincia  || '',
+          // Use stored contact only if it's a real phone; fall back to current profile phone
+          contact:   isPhone(l.contact) ? l.contact : (s.phone || ''),
+          provincia: l.provincia || s.provincia || '',
         };
       });
     }
@@ -181,7 +183,7 @@ router.post('/add',
 
       const photos    = req.files.map(f => f.path);
       const provincia = user.provincia || '';
-      const contact   = user.phone    || user.email || '';
+      const contact   = user.phone     || ''; // phone only — email is never a valid WA contact
 
       // featured is a manual/earned distinction — never auto-set on creation
       const newListing = new Listing({
