@@ -37,18 +37,18 @@
 
   <!-- Cart basket outline (gold) -->
   <path d="M10,5 H92 L85,69 Q84,74 79,74 H23 Q18,74 17,69 Z"
-        fill="none" stroke="#C8952C" stroke-width="7" stroke-linejoin="round"/>
+        fill="none" stroke="#e8c97a" stroke-width="7" stroke-linejoin="round"/>
 
   <!-- Handle — arc from basket top-right, sweeping right then down -->
   <path d="M92,6 Q109,5 110,22 L110,46"
-        fill="none" stroke="#C8952C" stroke-width="7"
+        fill="none" stroke="#e8c97a" stroke-width="7"
         stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- Axle bar connecting wheels -->
   <line x1="26" y1="74" x2="74" y2="74"
-        stroke="#C8952C" stroke-width="7" stroke-linecap="round"/>
+        stroke="#e8c97a" stroke-width="7" stroke-linecap="round"/>
 
   <!-- Wheels -->
-  <circle cx="34" cy="84" r="8.5" fill="#C8952C"/>
-  <circle cx="66" cy="84" r="8.5" fill="#C8952C"/>
+  <circle cx="34" cy="84" r="8.5" fill="#e8c97a"/>
+  <circle cx="66" cy="84" r="8.5" fill="#e8c97a"/>
 </svg>
