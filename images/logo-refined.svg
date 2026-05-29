@@ -1,88 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 155">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
-
-    <!-- Minimal warm gold — handle, wheels, axle only -->
-    <linearGradient id="gold" x1="0" y1="0" x2="0.4" y2="1">
-      <stop offset="0%"   stop-color="#DDB83C"/>
-      <stop offset="100%" stop-color="#A07214"/>
-    </linearGradient>
-
-    <!-- Deep navy -->
     <linearGradient id="navy" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#1A3A8A"/>
-      <stop offset="100%" stop-color="#0C2060"/>
+      <stop offset="0%"   stop-color="#1C3F90"/>
+      <stop offset="100%" stop-color="#0E2560"/>
     </linearGradient>
-
-    <!-- Deep crimson -->
     <linearGradient id="crimson" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#A80E1A"/>
-      <stop offset="100%" stop-color="#6E0A12"/>
+      <stop offset="0%"   stop-color="#B8101E"/>
+      <stop offset="100%" stop-color="#800C16"/>
     </linearGradient>
-
-    <!--
-      Basket clip — rounded rect, no stroke/border drawn on top.
-      The flag colors ARE the visible basket body.
-    -->
     <clipPath id="basket">
-      <rect x="8" y="8" width="158" height="108" rx="16" ry="16"/>
+      <rect x="30" y="38" width="118" height="88" rx="16" ry="16"/>
     </clipPath>
-
   </defs>
 
-  <!-- ── Flag body — open, clean, dominant ───────────────────────────── -->
+  <!-- Flag stripes clipped to rounded basket — no gold border yet -->
   <g clip-path="url(#basket)">
-
-    <!-- Navy fills the whole basket as base -->
-    <rect x="0" y="0" width="210" height="160" fill="url(#navy)"/>
-
-    <!-- Left warm-white swoosh divider -->
-    <path d="M 50,0  C 36,62  48,120  42,124
-             L 64,124
-             C 70,120  58,62   72,0 Z"
-          fill="#D8D2C4"/>
-
-    <!-- Crimson centre band -->
-    <path d="M 72,0  C 58,62  70,120  64,124
-             L 118,124
-             C 124,120 112,62  126,0 Z"
+    <rect x="0" y="0" width="200" height="200" fill="url(#navy)"/>
+    <!-- Left white swoosh -->
+    <path d="M 58,28  C 44,82  56,138  50,144
+             L 72,144
+             C 78,138  66,82   80,28 Z"
+          fill="#DDD8CC"/>
+    <!-- Crimson centre -->
+    <path d="M 80,28  C 66,82  78,138  72,144
+             L 118,144
+             C 124,138 112,82  126,28 Z"
           fill="url(#crimson)"/>
-
-    <!-- Right warm-white swoosh divider -->
-    <path d="M 126,0  C 112,62  124,120 118,124
-             L 140,124
-             C 146,120 134,62  148,0 Z"
-          fill="#D8D2C4"/>
-
-    <!-- Right navy — base layer covers the rest -->
-
+    <!-- Right white swoosh -->
+    <path d="M 126,28 C 112,82 124,138 118,144
+             L 140,144
+             C 146,138 134,82  148,28 Z"
+          fill="#DDD8CC"/>
   </g>
 
-  <!-- ── Gold cart elements only — no box, no border ─────────────────── -->
-
-  <!-- Handle: attaches at right side of basket, curves up into hook, drops as grip -->
-  <path d="M 166,50
-           C 180,44 192,34 192,20
-           Q 192,8  178,8"
+  <!-- Gold basket border — exact same as estasies.png, color #e8c97a -->
+  <rect x="30" y="38" width="118" height="88" rx="16" ry="16"
         fill="none"
-        stroke="url(#gold)"
-        stroke-width="9"
+        stroke="#e8c97a"
+        stroke-width="10"/>
+
+  <!-- Handle -->
+  <path d="M 148,70
+           C 162,64 174,54 174,40
+           Q 174,28 160,28"
+        fill="none"
+        stroke="#e8c97a"
+        stroke-width="10"
         stroke-linecap="round"
         stroke-linejoin="round"/>
-
-  <!-- Grip — vertical bar -->
-  <line x1="192" y1="20" x2="192" y2="100"
-        stroke="url(#gold)"
-        stroke-width="9"
+  <line x1="174" y1="40" x2="174" y2="118"
+        stroke="#e8c97a"
+        stroke-width="10"
         stroke-linecap="round"/>
 
-  <!-- Axle bar — subtle bottom rail -->
-  <line x1="30" y1="128" x2="136" y2="128"
-        stroke="url(#gold)"
-        stroke-width="8"
+  <!-- Axle -->
+  <line x1="50" y1="142" x2="140" y2="142"
+        stroke="#e8c97a"
+        stroke-width="9"
         stroke-linecap="round"/>
 
   <!-- Wheels -->
-  <circle cx="48"  cy="143" r="13" fill="url(#gold)"/>
-  <circle cx="118" cy="143" r="13" fill="url(#gold)"/>
+  <circle cx="68"  cy="158" r="14" fill="#e8c97a"/>
+  <circle cx="122" cy="158" r="14" fill="#e8c97a"/>
 
 </svg>
