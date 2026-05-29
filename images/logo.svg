@@ -1,54 +1,62 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 114 92" role="img" aria-label="MercadoCR logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 96" role="img" aria-label="MercadoCR logo">
   <defs>
     <!--
-      Basket clip — wider at top, slight convergence at bottom, rounded lower corners.
-      All flag stripes are clipped to this shape.
+      inner-clip: the basket window through which the flag shows.
+      ~12 px inset on all sides from the outer basket shape so the
+      gold frame is clearly visible around the flag colors.
     -->
-    <clipPath id="c">
-      <path d="M10,5 H92 L85,69 Q84,74 79,74 H23 Q18,74 17,69 Z"/>
+    <clipPath id="inner-clip">
+      <path d="M22,4 H84 L78,63 Q77,68 73,68 H27 Q23,68 22,63 Z"/>
     </clipPath>
   </defs>
 
   <!--
-    Flag stripes — all dividing lines are quadratic béziers that bow LEFT as they
-    descend, so the stripes flow diagonally from lower-left to upper-right, matching
-    the waving-flag effect in your logo image.
-
-    Divider positions (verified with t=0.5 midpoint calculation):
-      D1: top=(30,0)  ctrl=(18,37)  bottom=(38,74)
-      D2: top=(38,0)  ctrl=(26,37)  bottom=(46,74)
-      D3: top=(62,0)  ctrl=(50,37)  bottom=(70,74)
-      D4: top=(70,0)  ctrl=(58,37)  bottom=(78,74)
-
-    All white separators are exactly 8 px wide at every y — confirmed analytically.
+    ── LAYER 1: Gold cart silhouette ──────────────────────────────────────
+    Drawn as one continuous thick-stroke path so the whole cart —
+    left frame, bottom, right frame, handle — is the same #e8c97a gold.
+    stroke-linecap / linejoin are round for the smooth look from the logo.
   -->
-  <g clip-path="url(#c)">
-    <!-- Blue left -->
-    <path d="M0,0 H30 Q18,37 38,74 H0 Z"           fill="#003DA5"/>
-    <!-- White separator -->
-    <path d="M30,0 Q18,37 38,74 H46 Q26,37 38,0 Z" fill="#ffffff"/>
-    <!-- Red centre -->
-    <path d="M38,0 Q26,37 46,74 H70 Q50,37 62,0 Z" fill="#CE1126"/>
-    <!-- White separator -->
-    <path d="M62,0 Q50,37 70,74 H78 Q58,37 70,0 Z" fill="#ffffff"/>
-    <!-- Blue right -->
-    <path d="M70,0 Q58,37 78,74 H114 V0 Z"         fill="#003DA5"/>
-  </g>
 
-  <!-- Cart basket outline (gold) -->
-  <path d="M10,5 H92 L85,69 Q84,74 79,74 H23 Q18,74 17,69 Z"
-        fill="none" stroke="#e8c97a" stroke-width="7" stroke-linejoin="round"/>
+  <!-- Left + Bottom + Right basket frame (open at top) -->
+  <path d="M10,4 L15,69 Q16,76 22,76 H82 Q88,76 89,69 L95,4"
+        fill="none" stroke="#e8c97a" stroke-width="18"
+        stroke-linecap="butt" stroke-linejoin="round"/>
 
-  <!-- Handle — arc from basket top-right, sweeping right then down -->
-  <path d="M92,6 Q109,5 110,22 L110,46"
-        fill="none" stroke="#e8c97a" stroke-width="7"
+  <!-- Handle: continues from top-right, sweeps right then down -->
+  <path d="M95,4 Q112,2 113,20 L113,48"
+        fill="none" stroke="#e8c97a" stroke-width="18"
         stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Axle bar connecting wheels -->
-  <line x1="26" y1="74" x2="74" y2="74"
-        stroke="#e8c97a" stroke-width="7" stroke-linecap="round"/>
+  <!-- Axle bar linking the two wheels -->
+  <line x1="29" y1="76" x2="73" y2="76"
+        stroke="#e8c97a" stroke-width="14" stroke-linecap="round"/>
 
   <!-- Wheels -->
-  <circle cx="34" cy="84" r="8.5" fill="#e8c97a"/>
-  <circle cx="66" cy="84" r="8.5" fill="#e8c97a"/>
+  <circle cx="36" cy="88" r="10" fill="#e8c97a"/>
+  <circle cx="66" cy="88" r="10" fill="#e8c97a"/>
+
+  <!--
+    ── LAYER 2: Flag stripes ────────────────────────────────────────────
+    Clipped to the inner-clip window so they appear inside the gold frame.
+    Curves all bow leftward going down → diagonal waving-flag effect.
+
+    Dividers (verified at t=0.5 midpoint):
+      D1: top=(30,0) ctrl=(18,34) bottom=(38,68)  — left/white boundary
+      D2: top=(38,0) ctrl=(26,34) bottom=(46,68)  — white/red boundary
+      D3: top=(62,0) ctrl=(50,34) bottom=(70,68)  — red/white boundary
+      D4: top=(70,0) ctrl=(58,34) bottom=(78,68)  — white/right boundary
+    White separators are 8 px wide at every height.
+  -->
+  <g clip-path="url(#inner-clip)">
+    <!-- Blue left -->
+    <path d="M0,0 H30 Q18,34 38,68 H0 Z"           fill="#003DA5"/>
+    <!-- White separator -->
+    <path d="M30,0 Q18,34 38,68 H46 Q26,34 38,0 Z" fill="#ffffff"/>
+    <!-- Red centre -->
+    <path d="M38,0 Q26,34 46,68 H70 Q50,34 62,0 Z" fill="#CE1126"/>
+    <!-- White separator -->
+    <path d="M62,0 Q50,34 70,68 H78 Q58,34 70,0 Z" fill="#ffffff"/>
+    <!-- Blue right -->
+    <path d="M70,0 Q58,34 78,68 H118 V0 Z"         fill="#003DA5"/>
+  </g>
 </svg>
