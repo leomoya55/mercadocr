@@ -1,66 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 200">
   <defs>
-    <linearGradient id="navy" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#1C3F90"/>
-      <stop offset="100%" stop-color="#0E2560"/>
-    </linearGradient>
-    <linearGradient id="crimson" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#B8101E"/>
-      <stop offset="100%" stop-color="#800C16"/>
-    </linearGradient>
     <clipPath id="basket">
-      <rect x="30" y="38" width="118" height="88" rx="16" ry="16"/>
+      <rect x="20" y="30" width="140" height="108" rx="20" ry="20"/>
     </clipPath>
   </defs>
 
-  <!-- Flag stripes clipped to rounded basket — no gold border yet -->
+  <!-- ── Flag stripes — vivid CR colors, clipped to rounded basket ── -->
   <g clip-path="url(#basket)">
-    <rect x="0" y="0" width="200" height="200" fill="url(#navy)"/>
+    <!-- Blue base fills entire basket -->
+    <rect x="0" y="0" width="220" height="220" fill="#0038A8"/>
+
     <!-- Left white swoosh -->
-    <path d="M 58,28  C 44,82  56,138  50,144
-             L 72,144
-             C 78,138  66,82   80,28 Z"
-          fill="#DDD8CC"/>
-    <!-- Crimson centre -->
-    <path d="M 80,28  C 66,82  78,138  72,144
-             L 118,144
-             C 124,138 112,82  126,28 Z"
-          fill="url(#crimson)"/>
+    <path d="M 60,20  C 44,74  58,136  50,145
+             L 76,145
+             C 84,136  70,74   86,20 Z"
+          fill="#FFFFFF"/>
+
+    <!-- Red centre band -->
+    <path d="M 86,20  C 70,74  84,136  76,145
+             L 130,145
+             C 138,136 124,74  140,20 Z"
+          fill="#CE1126"/>
+
     <!-- Right white swoosh -->
-    <path d="M 126,28 C 112,82 124,138 118,144
-             L 140,144
-             C 146,138 134,82  148,28 Z"
-          fill="#DDD8CC"/>
+    <path d="M 140,20 C 124,74 138,136 130,145
+             L 156,145
+             C 164,136 150,74  166,20 Z"
+          fill="#FFFFFF"/>
+
+    <!-- Right blue — base layer already covers it -->
   </g>
 
-  <!-- Gold basket border — exact same as estasies.png, color #e8c97a -->
-  <rect x="30" y="38" width="118" height="88" rx="16" ry="16"
-        fill="none"
-        stroke="#e8c97a"
-        stroke-width="10"/>
+  <!-- ── Gold cart — color exactly #e8c97a, matching MercadoCR text ── -->
 
-  <!-- Handle -->
-  <path d="M 148,70
-           C 162,64 174,54 174,40
-           Q 174,28 160,28"
+  <!-- Basket border -->
+  <rect x="20" y="30" width="140" height="108" rx="20" ry="20"
         fill="none"
         stroke="#e8c97a"
-        stroke-width="10"
+        stroke-width="12"/>
+
+  <!-- Handle: attaches upper-right of basket, curves up into hook, drops as grip -->
+  <path d="M 160,68
+           C 176,60 190,50 190,34
+           Q 190,20 174,20"
+        fill="none"
+        stroke="#e8c97a"
+        stroke-width="12"
         stroke-linecap="round"
         stroke-linejoin="round"/>
-  <line x1="174" y1="40" x2="174" y2="118"
+
+  <!-- Grip — vertical bar -->
+  <line x1="190" y1="34" x2="190" y2="128"
         stroke="#e8c97a"
-        stroke-width="10"
+        stroke-width="12"
         stroke-linecap="round"/>
 
   <!-- Axle -->
-  <line x1="50" y1="142" x2="140" y2="142"
+  <line x1="44" y1="154" x2="152" y2="154"
         stroke="#e8c97a"
-        stroke-width="9"
+        stroke-width="11"
         stroke-linecap="round"/>
 
   <!-- Wheels -->
-  <circle cx="68"  cy="158" r="14" fill="#e8c97a"/>
-  <circle cx="122" cy="158" r="14" fill="#e8c97a"/>
+  <circle cx="64"  cy="172" r="16" fill="#e8c97a"/>
+  <circle cx="132" cy="172" r="16" fill="#e8c97a"/>
 
 </svg>
