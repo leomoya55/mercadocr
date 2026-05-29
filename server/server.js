@@ -1,3 +1,7 @@
+// MUST be first: installs Sentry instrumentation before other libs load.
+// No-op unless SENTRY_DSN is set (see config/sentry.js).
+const sentry   = require('./config/sentry');
+
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
@@ -15,6 +19,11 @@ try { mongoSanitize = require('express-mongo-sanitize'); } catch { /* not instal
 const app  = express();
 const port = process.env.PORT || 5000;
 
+// In production, never auto-build indexes on connect — on serverless that would
+// fire on every cold start and add latency/timeout risk. Indexes are created
+// once via a guarded migration (ensure_indexes_v2) in runStartupMigrations().
+mongoose.set('autoIndex', process.env.NODE_ENV !== 'production');
+
 // ─── Security headers ─────────────────────────────────────────────────────────
 if (helmet) {
   app.use(helmet({
@@ -29,6 +38,14 @@ const requiredEnv = ['MONGO_URI', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
 const missing = requiredEnv.filter(k => !process.env[k]);
 if (missing.length > 0) {
   console.error('MISSING ENV VARS:', missing.join(', '));
+  // SECURITY: in production, refuse to boot with missing secrets. Without the
+  // Firebase Admin credentials, verifyToken silently falls back to accepting
+  // UNSIGNED tokens (see middleware/auth.js) — anyone could forge an admin
+  // identity. Failing fast here makes that degradation impossible in prod.
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Refusing to start in production with missing env vars.');
+    process.exit(1);
+  }
 }
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -58,6 +75,12 @@ const apiLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  // CRITICAL: never rate-limit Stripe's webhook. Stripe retries from many IPs and
+  // a 429 here means permanently lost payment events. The cron endpoint is
+  // separately authenticated and must not be throttled either.
+  skip: (req) =>
+    req.path === '/api/payment/webhook' ||
+    req.path.startsWith('/api/cron/'),
 });
 app.use('/api/', apiLimiter);
 
@@ -120,27 +143,41 @@ app.get('/product', async (req, res, next) => {
     const htmlPath = path.join(__dirname, '../product.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
 
-    const name   = listing.name        || 'Anuncio';
-    const desc   = listing.description || 'Ver anuncio en MercadoCR';
-    const price  = '₡' + Number(listing.price).toLocaleString('es-CR');
-    const photo  = listing.photos && listing.photos[0] ? listing.photos[0] : '';
+    // SECURITY (stored XSS): listing name/description are attacker-controlled and
+    // are injected into HTML here. The previous code escaped only double-quotes
+    // and put the RAW name inside <title>, so a listing named
+    //   </title><script>…</script>
+    // executed for every visitor of the product page. Escape ALL HTML-significant
+    // characters for every interpolated value, in both element and attribute
+    // contexts.
+    const esc = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const name   = esc(listing.name || 'Anuncio');
+    const desc   = esc((listing.description || 'Ver anuncio en MercadoCR').slice(0, 200));
+    const price  = esc('₡' + Number(listing.price || 0).toLocaleString('es-CR'));
+    // Only allow http(s) image URLs into the og:image attribute.
+    const rawPhoto = (listing.photos && listing.photos[0]) ? String(listing.photos[0]) : '';
+    const photo  = /^https?:\/\//i.test(rawPhoto) ? esc(rawPhoto) : '';
     const title  = `${name} — ${price} | MercadoCR`;
-    const descSafe = desc.replace(/"/g, '&quot;').slice(0, 200);
-    const nameSafe = name.replace(/"/g, '&quot;');
 
     html = html
       .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
       .replace(
         '</head>',
-        `  <meta name="description" content="${descSafe}">\n` +
-        `  <meta property="og:title" content="${nameSafe}">\n` +
-        `  <meta property="og:description" content="${descSafe}">\n` +
+        `  <meta name="description" content="${desc}">\n` +
+        `  <meta property="og:title" content="${name}">\n` +
+        `  <meta property="og:description" content="${desc}">\n` +
         `  <meta property="og:type" content="product">\n` +
         (photo ? `  <meta property="og:image" content="${photo}">\n` : '') +
         `  <meta property="og:site_name" content="MercadoCR">\n` +
         `  <meta name="twitter:card" content="summary_large_image">\n` +
-        `  <meta name="twitter:title" content="${nameSafe}">\n` +
-        `  <meta name="twitter:description" content="${descSafe}">\n` +
+        `  <meta name="twitter:title" content="${name}">\n` +
+        `  <meta name="twitter:description" content="${desc}">\n` +
         (photo ? `  <meta name="twitter:image" content="${photo}">\n` : '') +
         '</head>'
       );
@@ -259,6 +296,41 @@ async function runStartupMigrations() {
     //    We track completion in a _migrations collection so this step is skipped
     //    on subsequent cold starts and never touches listings the admin
     //    intentionally features via the admin panel in the future.
+    // 5b. Ensure all schema indexes exist (one-time per schema version).
+    //
+    //     autoIndex is disabled in production, so we build indexes explicitly here
+    //     exactly once, guarded by a _migrations marker. createIndexes only ADDS
+    //     missing indexes (never drops), so it's safe and idempotent. Each model
+    //     is wrapped independently: a failure to build one (e.g. a legacy
+    //     duplicate-email blocking the unique index) is logged but never blocks
+    //     the others or the server. Bump the version suffix to force a rebuild
+    //     after adding new indexes.
+    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v2' });
+    if (!indexesRan) {
+      const models = {
+        User:           require('./models/user.model'),
+        Listing:        require('./models/listing.model'),
+        Report:         require('./models/report.model'),
+        ProcessedEvent: require('./models/processedEvent.model'),
+        AuditLog:       require('./models/auditLog.model'),
+      };
+      let allOk = true;
+      for (const [name, Model] of Object.entries(models)) {
+        try {
+          await Model.createIndexes();
+          console.log(`[migration] Indexes ensured for ${name}`);
+        } catch (e) {
+          allOk = false;
+          console.error(`[migration] createIndexes failed for ${name}:`, e.message);
+        }
+      }
+      // Only mark complete if every model succeeded, so a transient failure
+      // (e.g. a duplicate that still needs cleanup) retries on the next cold start.
+      if (allOk) {
+        await migrationsCol.insertOne({ name: 'ensure_indexes_v2', ranAt: new Date() });
+      }
+    }
+
     const alreadyRan = await migrationsCol.findOne({ name: 'clear_auto_featured_v1' });
     if (!alreadyRan) {
       const listingsCol = mongoose.connection.collection('listings');
@@ -369,6 +441,10 @@ app.use('/api/payment',  require('./routes/payment'));
 app.use('/api/users',    require('./routes/users'));
 app.use('/api/reports',  require('./routes/reports'));
 app.use('/api/admin',    require('./routes/admin'));
+app.use('/api/cron',     require('./routes/cron'));
+
+// Sentry express error handler — must come AFTER all routes. No-op when disabled.
+sentry.setupExpressErrorHandler(app);
 
 if (require.main === module) {
   app.listen(port, () => console.log(`Server running on port ${port}`));

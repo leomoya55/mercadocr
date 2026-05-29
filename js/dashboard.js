@@ -251,6 +251,14 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
+        // Proration: tier changed on the existing subscription in-place.
+        if (data.upgraded) {
+          UserStore.invalidate();
+          Toast.success('Tu plan cambió a Pro. El cobro se prorrateó.');
+          setTimeout(() => window.location.reload(), 1400);
+          return;
+        }
+
         if (data.url) {
           window.location.href = data.url;
         } else {

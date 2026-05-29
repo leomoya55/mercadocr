@@ -3,19 +3,34 @@ const User     = require('../models/user.model');
 const Listing  = require('../models/listing.model');
 const { verifyToken }            = require('../middleware/auth');
 const { ensureUser }             = require('../middleware/ensureUser');
-const { getActiveCount }         = require('../middleware/listingLimits');
-const { getPlan, isOwner }       = require('../config/plans');
+const { getActiveCount }          = require('../middleware/listingLimits');
+const { getPlan, isOwner }        = require('../config/plans');
+const { getEffectiveMembership }  = require('../config/membership');
 
 // ─── Shared helper: build the profile response payload ───────────────────────
 
-async function buildProfileResponse(uid, user) {
+async function buildProfileResponse(uid, user, email) {
   const listingCount = await getActiveCount(uid);
-  const plan         = getPlan(user.plan);
+  // Report the RESOLVED plan, not the stored one — an expired/lapsed paid plan
+  // must surface as free so the UI and the user agree with backend enforcement.
+  const eff          = getEffectiveMembership(user, email);
+  const plan         = getPlan(eff.plan);
   const credits      = user.singlePostCredits || 0;
   const maxListings  = plan.maxListings === Infinity ? null : plan.maxListings;
   const remaining    = maxListings === null ? null : Math.max(0, maxListings - listingCount);
 
-  return { user, listingCount, remaining, maxListings, credits };
+  return {
+    user,
+    plan: eff.plan,                      // canonical resolved tier
+    effective: {                         // richer state for the UI
+      plan: eff.plan,
+      active: eff.active,
+      status: eff.status,
+      currentPeriodEnd: eff.currentPeriodEnd,
+      cancelAtPeriodEnd: eff.cancelAtPeriodEnd,
+    },
+    listingCount, remaining, maxListings, credits,
+  };
 }
 
 // ─── Public ──────────────────────────────────────────────────────────────────
@@ -53,7 +68,7 @@ router.get('/public/:uid', async (req, res) => {
  */
 router.get('/me', verifyToken, ensureUser, async (req, res) => {
   try {
-    res.json(await buildProfileResponse(req.uid, req.dbUser));
+    res.json(await buildProfileResponse(req.uid, req.dbUser, req.email));
   } catch (err) {
     console.error('[GET /me]', err.message);
     res.status(500).json({ error: err.message });
@@ -189,7 +204,7 @@ router.post('/ensure', verifyToken, async (req, res) => {
 router.get('/:uid', verifyToken, ensureUser, async (req, res) => {
   try {
     if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
-    res.json(await buildProfileResponse(req.uid, req.dbUser));
+    res.json(await buildProfileResponse(req.uid, req.dbUser, req.email));
   } catch (err) {
     console.error('[GET /:uid]', err.message);
     res.status(500).json({ error: err.message });
@@ -247,32 +262,16 @@ router.put('/:uid/profile', verifyToken, ensureUser, async (req, res) => {
   }
 });
 
-// PUT /:uid/plan — plan update (webhook is the primary writer; this is a fallback)
-router.put('/:uid/plan', verifyToken, async (req, res) => {
-  try {
-    if (req.uid !== req.params.uid) return res.status(403).json('Forbidden');
-    const { plan, planExpiresAt, stripeCustomerId, stripeSubscriptionId } = req.body;
-
-    const set = {};
-    if (plan                 !== undefined) set.plan                 = plan;
-    if (planExpiresAt        !== undefined) set.planExpiresAt        = planExpiresAt;
-    if (stripeCustomerId     !== undefined) set.stripeCustomerId     = stripeCustomerId;
-    if (stripeSubscriptionId !== undefined) set.stripeSubscriptionId = stripeSubscriptionId;
-
-    const updated = await User.findOneAndUpdate(
-      { firebaseUid: req.params.uid },
-      { $set: set },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json('User not found');
-
-    // featured is a standalone paid promotion — never auto-toggled on plan change.
-    // See server/config/featured.js for the featured architecture roadmap.
-    res.json({ user: updated });
-  } catch (err) {
-    console.error('[PUT /:uid/plan]', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
+// ─── Plan mutation is INTENTIONALLY not exposed here ──────────────────────────
+//
+// SECURITY: There is deliberately NO user-facing endpoint to set `plan`,
+// `planExpiresAt`, `stripeCustomerId`, or `stripeSubscriptionId`. The only
+// writers of those fields are:
+//   1. The Stripe webhook (server/routes/payment.js) — the source of truth.
+//   2. The admin route (server/routes/admin.js) — manual owner grants.
+//
+// A previous `PUT /:uid/plan` route let any authenticated user set their OWN
+// plan to 'pro' (the guard only blocked editing OTHER users), which completely
+// bypassed payment. It was removed. Do not re-add a self-serve plan setter.
 
 module.exports = router;

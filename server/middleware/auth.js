@@ -24,18 +24,24 @@ const verifyToken = async (req, res, next) => {
   const token = authHeader.split('Bearer ')[1];
   try {
     if (hasAdminConfig) {
-      // Production: full cryptographic verification
+      // Full cryptographic verification (production + any env with Firebase creds)
       const decoded = await admin.auth().verifyIdToken(token);
-      // Temporary diagnostic log — remove once E11000 stale-index issue is confirmed gone
-      console.log('[verifyToken] decoded.uid present:', !!decoded.uid, '| type:', typeof decoded.uid);
       if (!decoded.uid) {
         return res.status(401).json({ error: 'Token missing UID', code: 'NO_UID_IN_TOKEN' });
       }
       req.uid   = decoded.uid;
       req.email = (decoded.email || '').toLowerCase().trim();
     } else {
-      // Dev mode: decode JWT payload without signature verification
-      // Firebase tokens are JWTs — user_id/sub holds the UID
+      // ── INSECURE dev-only fallback ──────────────────────────────────────────
+      // Decodes the JWT payload WITHOUT verifying the signature. This trusts any
+      // self-crafted token and must NEVER run in production. server.js already
+      // process.exit(1)s in production when Firebase env is missing, so
+      // hasAdminConfig is always true there — but we double-guard here so this
+      // branch can never be reached in prod even if that check is ever removed.
+      if (process.env.NODE_ENV === 'production' || process.env.ALLOW_INSECURE_AUTH !== 'true') {
+        console.error('[verifyToken] Firebase Admin not configured and insecure auth not explicitly enabled — rejecting.');
+        return res.status(401).json({ error: 'Auth not configured', code: 'AUTH_NOT_CONFIGURED' });
+      }
       const payloadB64 = token.split('.')[1];
       const json = Buffer.from(payloadB64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
       const payload = JSON.parse(json);

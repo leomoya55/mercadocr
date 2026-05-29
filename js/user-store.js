@@ -90,8 +90,22 @@
     let data = await _fetchMe();
     data     = await _forwardRegData(data);
 
-    // Owner always gets Pro — regardless of what the DB says
-    if (firebaseUser.email === OWNER_EMAIL) data.user.plan = 'pro';
+    // AUTHORITATIVE PLAN: the backend (config/membership.js) resolves the real
+    // entitlement — validating Stripe status + expiration — and returns it as
+    // data.plan. We mirror it onto data.user.plan so EVERY consumer that reads
+    // user.plan automatically gets the resolved tier and never a stale stored
+    // value. An expired/past_due paid plan correctly surfaces as 'free'.
+    if (typeof data.plan === 'string') data.user.plan = data.plan;
+
+    // data.effective carries { plan, active, status, currentPeriodEnd,
+    // cancelAtPeriodEnd } for cancellation / expiration UI.
+    if (!data.effective) data.effective = null;
+
+    // Owner always gets Pro — regardless of what the DB or Stripe says.
+    if (firebaseUser.email === OWNER_EMAIL) {
+      data.user.plan = 'pro';
+      data.plan      = 'pro';
+    }
 
     return data;
   }

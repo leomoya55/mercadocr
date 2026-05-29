@@ -12,6 +12,7 @@ const router  = require('express').Router();
 const Listing = require('../models/listing.model');
 const User    = require('../models/user.model');
 const Report  = require('../models/report.model');
+const AuditLog = require('../models/auditLog.model');
 const { verifyToken } = require('../middleware/auth');
 const { isOwner }     = require('../config/plans');
 
@@ -22,6 +23,19 @@ router.use(verifyToken, (req, res, next) => {
   }
   next();
 });
+
+/**
+ * Append an audit-log entry. Fire-and-forget: logging must never break or block
+ * the admin action itself, but failures are surfaced to server logs.
+ */
+function audit(req, action, targetType, targetId, meta = {}) {
+  AuditLog.create({
+    actorUid:   req.uid,
+    actorEmail: req.email,
+    action, targetType, targetId, meta,
+    ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null,
+  }).catch(e => console.error('[audit] write failed:', action, e.message));
+}
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +125,7 @@ router.post('/listings/:id/hide', async (req, res) => {
   try {
     const listing = await Listing.findByIdAndUpdate(req.params.id, { hidden: true }, { new: true });
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    audit(req, 'listing.hide', 'listing', req.params.id, { name: listing.name, author: listing.author });
     res.json({ success: true, hidden: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -121,6 +136,7 @@ router.post('/listings/:id/unhide', async (req, res) => {
   try {
     const listing = await Listing.findByIdAndUpdate(req.params.id, { hidden: false }, { new: true });
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    audit(req, 'listing.unhide', 'listing', req.params.id, { name: listing.name, author: listing.author });
     res.json({ success: true, hidden: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -137,6 +153,7 @@ router.post('/listings/:id/feature', async (req, res) => {
       req.params.id, { featured }, { new: true }
     );
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    audit(req, 'listing.feature', 'listing', req.params.id, { featured });
     res.json({ success: true, featured: listing.featured });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -150,6 +167,7 @@ router.delete('/listings/:id', async (req, res) => {
   try {
     const listing = await Listing.findByIdAndDelete(req.params.id);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    audit(req, 'listing.delete', 'listing', req.params.id, { name: listing.name, author: listing.author, price: listing.price });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -198,12 +216,33 @@ router.post('/users/:uid/plan', async (req, res) => {
     if (!valid.includes(plan)) {
       return res.status(400).json({ error: 'Invalid plan', valid });
     }
+
+    const before = await User.findOne({ firebaseUid: req.params.uid }).select('plan').lean();
+    if (!before) return res.status(404).json({ error: 'User not found' });
+
+    // Manual grant of a paid tier is a comp with no Stripe subscription, so we
+    // clear stale subscription fields. The membership resolver treats a paid plan
+    // with null status/period as a legacy/comp grant and keeps it (never expires).
+    const set = { plan };
+    if (plan === 'free') {
+      set.subscriptionStatus = 'canceled';
+      set.currentPeriodEnd   = null;
+      set.planExpiresAt      = null;
+      set.cancelAtPeriodEnd  = false;
+    } else {
+      // comp grant: detach from any Stripe state so the resolver keeps it active.
+      set.subscriptionStatus = null;
+      set.currentPeriodEnd   = null;
+      set.planExpiresAt      = null;
+      set.cancelAtPeriodEnd  = false;
+    }
+
     const user = await User.findOneAndUpdate(
       { firebaseUid: req.params.uid },
-      { $set: { plan } },
+      { $set: set },
       { new: true }
     );
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    audit(req, 'user.plan.set', 'user', req.params.uid, { from: before.plan, to: plan });
     res.json({ success: true, plan: user.plan });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -232,6 +271,7 @@ router.post('/users/:uid/credits', async (req, res) => {
       user.singlePostCredits = 0;
     }
 
+    audit(req, 'user.credits.adjust', 'user', req.params.uid, { delta, newBalance: user.singlePostCredits });
     res.json({ success: true, credits: user.singlePostCredits });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -284,8 +324,36 @@ router.post('/reports/:id/:action', async (req, res) => {
       req.params.id, { status: action }, { new: true }
     );
     if (!report) return res.status(404).json({ error: 'Report not found' });
+    audit(req, 'report.' + action, 'report', req.params.id, { listingId: report.listingId });
     res.json({ success: true, status: report.status });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Audit log (read-only) ────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/audit
+ * Query params: page, limit, action, actorUid, targetId
+ */
+router.get('/audit', async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 50);
+    const skip  = (page - 1) * limit;
+    const filter = {};
+    if (req.query.action)   filter.action   = req.query.action;
+    if (req.query.actorUid) filter.actorUid = req.query.actorUid;
+    if (req.query.targetId) filter.targetId = req.query.targetId;
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      AuditLog.countDocuments(filter),
+    ]);
+    res.json({ logs, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error('[GET /admin/audit]', err);
     res.status(500).json({ error: err.message });
   }
 });

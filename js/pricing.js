@@ -34,47 +34,83 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('pricing-cancel-section')?.remove();
   }
 
-  function applyPlanUI(currentPlan) {
+  // Format an ISO date as a localized Costa Rica date.
+  function fmtDate(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleDateString('es-CR', { day: 'numeric', month: 'long', year: 'numeric' }); }
+    catch { return ''; }
+  }
+
+  /**
+   * Render the subscription panel from the RESOLVED membership (data.effective).
+   * @param {'free'|'basic'|'pro'} currentPlan
+   * @param {object|null} effective { active, status, currentPeriodEnd, cancelAtPeriodEnd }
+   */
+  function applyPlanUI(currentPlan, effective) {
     removeCancelSection();
 
     if (basicButton) { basicButton.disabled = false; basicButton.textContent = LABELS.basic; basicButton.classList.remove('current-plan-btn'); }
     if (proButton)   { proButton.disabled = false;   proButton.textContent = LABELS.pro;     proButton.classList.remove('current-plan-btn'); }
 
-    if (currentPlan === 'basic' || currentPlan === 'pro') {
-      const btn = currentPlan === 'basic' ? basicButton : proButton;
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = '✓ Plan activo';
-        btn.classList.add('current-plan-btn');
-      }
+    if (currentPlan !== 'basic' && currentPlan !== 'pro') return; // free → nothing to manage
 
-      const section = document.createElement('section');
-      section.id = 'pricing-cancel-section';
-      section.className = 'pricing-cancel';
+    const btn = currentPlan === 'basic' ? basicButton : proButton;
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '✓ Plan activo';
+      btn.classList.add('current-plan-btn');
+    }
+
+    const planName = currentPlan === 'pro' ? 'Pro' : 'Basic';
+    const until    = fmtDate(effective && effective.currentPeriodEnd);
+    const willCancel = !!(effective && effective.cancelAtPeriodEnd);
+
+    const section = document.createElement('section');
+    section.id = 'pricing-cancel-section';
+    section.className = 'pricing-cancel';
+
+    if (willCancel) {
+      // Scheduled to cancel — user keeps access until period end; offer resume.
       section.innerHTML = `
-        <p>Tienes el plan <strong>${currentPlan === 'pro' ? 'Pro' : 'Basic'}</strong> activo.</p>
+        <p>Tu plan <strong>${planName}</strong> está activo${until ? ` hasta el <strong>${until}</strong>` : ''} y <strong>no se renovará</strong>.</p>
+        <button class="cancel-sub-btn" id="resume-sub-btn" type="button">Reanudar suscripción</button>
+      `;
+      document.querySelector('.pricing-cards').after(section);
+      document.getElementById('resume-sub-btn').addEventListener('click', async () => {
+        const b = document.getElementById('resume-sub-btn');
+        b.disabled = true; b.textContent = 'Reanudando...';
+        try {
+          const res = await authFetch('/api/payment/resume-subscription', { method: 'POST' });
+          if (res.ok) {
+            if (typeof UserStore !== 'undefined') UserStore.invalidate();
+            showBanner('Tu suscripción se reanudó y se renovará normalmente.');
+            window.location.reload();
+          } else { b.disabled = false; b.textContent = 'Reanudar suscripción'; }
+        } catch { b.disabled = false; b.textContent = 'Reanudar suscripción'; }
+      });
+    } else {
+      // Active and renewing — offer cancellation (cancels at period end).
+      section.innerHTML = `
+        <p>Tienes el plan <strong>${planName}</strong> activo${until ? `. Se renovará el <strong>${until}</strong>` : ''}.</p>
         <button class="cancel-sub-btn" id="cancel-sub-btn" type="button">Cancelar suscripción</button>
       `;
       document.querySelector('.pricing-cards').after(section);
-
       document.getElementById('cancel-sub-btn').addEventListener('click', async () => {
-        if (!confirm('¿Seguro que deseas cancelar tu suscripción? Tu plan volverá a Gratis.')) return;
+        if (!confirm('¿Cancelar la renovación? Mantendrás el acceso hasta el final del periodo que ya pagaste.')) return;
         const cancelBtn = document.getElementById('cancel-sub-btn');
-        cancelBtn.disabled = true;
-        cancelBtn.textContent = 'Cancelando...';
+        cancelBtn.disabled = true; cancelBtn.textContent = 'Cancelando...';
         try {
           const res = await authFetch('/api/payment/cancel-subscription', { method: 'POST' });
           if (res.ok) {
-            showBanner('Suscripción cancelada. Tu plan ha vuelto a Gratis.', 'info');
+            const body = await res.json().catch(() => ({}));
+            const end  = fmtDate(body.accessUntil);
+            if (typeof UserStore !== 'undefined') UserStore.invalidate();
+            showBanner(end
+              ? `Suscripción cancelada. Mantendrás acceso ${planName} hasta el ${end}.`
+              : 'Suscripción cancelada. Mantendrás el acceso hasta el final del periodo pagado.', 'info');
             window.location.reload();
-          } else {
-            cancelBtn.disabled = false;
-            cancelBtn.textContent = 'Cancelar suscripción';
-          }
-        } catch {
-          cancelBtn.disabled = false;
-          cancelBtn.textContent = 'Cancelar suscripción';
-        }
+          } else { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancelar suscripción'; }
+        } catch { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancelar suscripción'; }
       });
     }
   }
@@ -92,13 +128,34 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ type }),
       });
       const session = await response.json();
+
+      // Already on this plan (server-validated against resolved membership)
+      if (response.status === 400 && session.error === 'already_on_plan') {
+        showBanner(session.message || 'Ya tienes este plan activo.', 'info');
+        btn.disabled = false;
+        btn.textContent = LABELS[type];
+        return;
+      }
+
+      // Proration path: the backend swapped the price on the existing
+      // subscription in-place (no Checkout redirect). Reflect it immediately.
+      if (session.upgraded) {
+        if (typeof UserStore !== 'undefined') UserStore.invalidate();
+        showBanner(`Tu plan cambió a ${PLAN_LABELS[type] || type}. El ajuste de cobro se prorrateó automáticamente.`);
+        setTimeout(() => window.location.reload(), 1500);
+        return;
+      }
+
+      // New subscription: redirect to Stripe Checkout.
       if (session.url) {
         window.location.href = session.url;
       } else {
+        showBanner('No se pudo iniciar el pago. Intenta de nuevo.', 'info');
         btn.disabled = false;
         btn.textContent = LABELS[type];
       }
     } catch {
+      showBanner('Error de conexión. Intenta de nuevo.', 'info');
       btn.disabled = false;
       btn.textContent = LABELS[type];
     }
@@ -128,10 +185,12 @@ document.addEventListener('DOMContentLoaded', () => {
         await new Promise(r => setTimeout(r, 2000));
         try {
           const data = await authFetch(`/api/users/${user.uid}`).then(r => r.json());
-          if (data.user?.plan === targetPlan) {
+          // data.plan is the backend-resolved tier (never the stale stored field)
+          if (data.plan === targetPlan) {
             const label = PLAN_LABELS[targetPlan] || targetPlan;
             showBanner(`¡Plan ${label} activado con éxito! Bienvenido.`);
-            applyPlanUI(targetPlan);
+            if (typeof UserStore !== 'undefined') UserStore.invalidate();
+            applyPlanUI(data.plan, data.effective);
             activated = true;
             break;
           }
@@ -141,13 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
         showBanner('Pago recibido. Si tu plan no se actualiza en un momento, recarga la página.', 'info');
         try {
           const data = await authFetch(`/api/users/${user.uid}`).then(r => r.json());
-          if (data.user) applyPlanUI(data.user.plan);
+          if (data.plan) applyPlanUI(data.plan, data.effective);
         } catch {}
       }
     } else {
       try {
         const data = await authFetch(`/api/users/${user.uid}`).then(r => r.json());
-        if (data.user) applyPlanUI(data.user.plan);
+        if (data.plan) applyPlanUI(data.plan, data.effective);
       } catch {}
     }
   });

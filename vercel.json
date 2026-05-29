@@ -11,5 +11,8 @@
   ],
   "routes": [
     { "src": "/(.*)", "dest": "server/server.js" }
+  ],
+  "crons": [
+    { "path": "/api/cron/downgrade-expired", "schedule": "0 3 * * *" }
   ]
 }

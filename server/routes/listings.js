@@ -4,9 +4,35 @@ const User    = require('../models/user.model');
 const upload  = require('../config/cloudinary');
 const { verifyToken }          = require('../middleware/auth');
 const { ensureUser }           = require('../middleware/ensureUser');
-const { enforceListingLimit }  = require('../middleware/listingLimits');
+const { enforceListingLimit, getActiveCount, refundCreditIfUsed } = require('../middleware/listingLimits');
 const { isOwner }              = require('../config/plans');
 const { canFeatureListing }    = require('../config/featured');
+const { createListingLimiter } = require('../middleware/rateLimiters');
+
+// ─── Server-side listing validation (never trust the client) ─────────────────
+// Must match the <option value="…"> values in publish.html exactly.
+const VALID_CATEGORIES = new Set([
+  'Ropa y accesorios', 'Electrónica', 'Hogar y muebles',
+  'Vehículos', 'Servicios', 'Otros',
+]);
+const VALID_CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'regular', '']);
+
+function validateListingInput(body) {
+  const errors = [];
+  const name = String(body.name || '').trim();
+  const description = String(body.description || '').trim();
+  const priceNum = Number(body.price);
+  const category = String(body.category || '').trim();
+  const condition = body.condition === undefined ? '' : String(body.condition).trim();
+
+  if (name.length < 3 || name.length > 100) errors.push('El título debe tener entre 3 y 100 caracteres.');
+  if (description.length < 10 || description.length > 2000) errors.push('La descripción debe tener entre 10 y 2000 caracteres.');
+  if (!Number.isFinite(priceNum) || priceNum < 0 || priceNum > 1_000_000_000) errors.push('Precio inválido.');
+  if (!VALID_CATEGORIES.has(category)) errors.push('Categoría inválida.');
+  if (!VALID_CONDITIONS.has(condition)) errors.push('Condición inválida.');
+
+  return { errors, clean: { name, description, price: priceNum, category, condition } };
+}
 
 // ─── Public ──────────────────────────────────────────────────────────────────
 
@@ -216,6 +242,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/add',
   verifyToken,
+  createListingLimiter,   // anti-spam: keyed by uid, runs after verifyToken sets req.uid
   ensureUser,
   enforceListingLimit,
   upload.array('photos'),
@@ -223,10 +250,17 @@ router.post('/add',
     try {
       const uid  = req.uid;
       const user = req.dbUser;
-      const { name, description, price, category, condition } = req.body;
 
+      // 1. Server-side validation. If it fails AFTER a credit was consumed,
+      //    refund it so the user never pays ₡500 for a rejected post.
+      const { errors, clean } = validateListingInput(req.body);
+      if (errors.length) {
+        await refundCreditIfUsed(req);
+        return res.status(400).json({ error: errors.join(' '), code: 'VALIDATION' });
+      }
       if (!req.files || req.files.length === 0) {
-        return res.status(400).json('At least one photo is required');
+        await refundCreditIfUsed(req);
+        return res.status(400).json({ error: 'Se requiere al menos una foto.', code: 'NO_PHOTO' });
       }
 
       const photos    = req.files.map(f => f.path);
@@ -235,18 +269,39 @@ router.post('/add',
 
       // featured is a manual/earned distinction — never auto-set on creation
       const newListing = new Listing({
-        name, description, price, category,
-        condition: condition || '',
+        name: clean.name, description: clean.description, price: clean.price,
+        category: clean.category, condition: clean.condition,
         photos, contact, provincia,
         author: uid, featured: false,
       });
       await newListing.save();
 
-      // Return id, name, and first photo so the frontend can show a success modal
-      res.json({ message: 'Listing added!', id: newListing._id, name, photo: photos[0] || null });
+      // 2. Post-insert race reconciliation (TOCTOU guard).
+      //    enforceListingLimit checked the count, but two concurrent POST /add
+      //    requests can both pass the check and both insert, exceeding the limit.
+      //    Only applies to finite plan limits where NO credit was used (a credit
+      //    legitimately pays for one slot beyond the plan limit). If this insert
+      //    pushed the user over, we delete the just-created (newest) listing and
+      //    reject — failing SAFE toward the limit rather than over-granting.
+      const maxAllowed = req.maxListings;
+      if (maxAllowed !== Infinity && !req.usedCredit) {
+        const activeCount = await getActiveCount(uid);
+        if (activeCount > maxAllowed) {
+          await Listing.deleteOne({ _id: newListing._id });
+          return res.status(402).json({
+            error: 'Listing limit reached for your plan',
+            code:  'LIMIT_REACHED',
+            plan:  req.effPlan,
+            maxListings: maxAllowed,
+          });
+        }
+      }
+
+      res.json({ message: 'Listing added!', id: newListing._id, name: clean.name, photo: photos[0] || null });
     } catch (err) {
       console.error('[POST /add]', err);
-      res.status(500).json('Error: ' + err.message);
+      await refundCreditIfUsed(req); // never swallow a paid credit on error
+      res.status(500).json({ error: err.message, code: 'ADD_FAILED' });
     }
   }
 );

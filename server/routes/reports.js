@@ -2,6 +2,7 @@ const router  = require('express').Router();
 const Report  = require('../models/report.model');
 const Listing = require('../models/listing.model');
 const { verifyToken } = require('../middleware/auth');
+const { reportLimiter } = require('../middleware/rateLimiters');
 
 const VALID_REASONS = ['spam', 'scam', 'inappropriate', 'wrong_category', 'duplicate', 'other'];
 
@@ -10,7 +11,7 @@ const VALID_REASONS = ['spam', 'scam', 'inappropriate', 'wrong_category', 'dupli
  * Authenticated: any logged-in user can report a listing once.
  * A unique index on (listingId, reporterUid) prevents duplicate reports.
  */
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, reportLimiter, async (req, res) => {
   try {
     const { listingId, reason, details } = req.body;
 

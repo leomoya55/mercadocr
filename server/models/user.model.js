@@ -9,12 +9,51 @@ const userSchema = new mongoose.Schema({
     provincia:            { type: String, default: '' },
     plan:                 { type: String, enum: ['free', 'basic', 'pro'], default: 'free' },
     freeListingUsed:      { type: Boolean, default: false },
-    singlePostCredits:    { type: Number, default: 0 },
+    singlePostCredits:    { type: Number, default: 0, min: 0 },
     listingsCount:        { type: Number, default: 0 },
-    planExpiresAt:        { type: Date, default: null },
+
+    // ─── Stripe / subscription state ────────────────────────────────────────
+    // These are a CACHE of Stripe's state, written ONLY by the webhook and the
+    // cron backstop. Never read `plan` directly for entitlement decisions — use
+    // config/membership.js → getEffectiveMembership(), which validates these
+    // fields so a missed webhook can't grant indefinite free access.
     stripeCustomerId:     { type: String, default: null },
     stripeSubscriptionId: { type: String, default: null },
+    subscriptionStatus:   { type: String, default: null }, // active|trialing|past_due|canceled|unpaid|incomplete|incomplete_expired|paused
+    currentPeriodEnd:     { type: Date,   default: null }, // canonical paid-through date
+    cancelAtPeriodEnd:    { type: Boolean, default: false },
+    planExpiresAt:        { type: Date,   default: null }, // LEGACY: kept in sync for old data; prefer currentPeriodEnd
+
     createdAt:            { type: Date, default: Date.now },
+}, {
+    timestamps: true, // adds updatedAt; createdAt above is preserved for legacy data
 });
+
+// ─── Indexes (created via syncIndexes in a guarded startup migration; autoIndex
+//     is disabled in production — see server.js) ─────────────────────────────
+
+// Email uniqueness — the dedup_users_by_email_v1 migration already removed dupes.
+userSchema.index({ email: 1 }, { unique: true });
+
+// Phone uniqueness, but ONLY for real (non-empty) phone numbers. A plain unique
+// index would collide on the many users whose phone is '' (the schema default).
+// partialFilterExpression indexes only documents with a non-empty string phone.
+userSchema.index(
+  { phone: 1 },
+  { unique: true, partialFilterExpression: { phone: { $type: 'string', $gt: '' } } }
+);
+
+// Stripe lookups (webhook fallback path) — unique where present.
+userSchema.index(
+  { stripeCustomerId: 1 },
+  { unique: true, partialFilterExpression: { stripeCustomerId: { $type: 'string' } } }
+);
+userSchema.index(
+  { stripeSubscriptionId: 1 },
+  { unique: true, partialFilterExpression: { stripeSubscriptionId: { $type: 'string' } } }
+);
+
+// Cron backstop scans for paid users whose period has lapsed.
+userSchema.index({ plan: 1, currentPeriodEnd: 1 });
 
 module.exports = mongoose.model('User', userSchema);
