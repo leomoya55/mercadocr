@@ -1,48 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 192">
   <defs>
     <clipPath id="basket">
-      <rect x="20" y="30" width="140" height="108" rx="20" ry="20"/>
+      <rect x="12" y="22" width="142" height="108" rx="18" ry="18"/>
     </clipPath>
   </defs>
 
-  <!-- ── Flag stripes — vivid CR colors, clipped to rounded basket ── -->
+  <!-- ── Flag colors — open, no gold border around them ─────────────── -->
   <g clip-path="url(#basket)">
-    <!-- Blue base fills entire basket -->
-    <rect x="0" y="0" width="220" height="220" fill="#0038A8"/>
+    <rect x="0" y="0" width="210" height="192" fill="#0038A8"/>
 
     <!-- Left white swoosh -->
-    <path d="M 60,20  C 44,74  58,136  50,145
-             L 76,145
-             C 84,136  70,74   86,20 Z"
+    <path d="M 56,14  C 40,68  54,130  46,138
+             L 72,138
+             C 80,130  66,68   82,14 Z"
           fill="#FFFFFF"/>
 
-    <!-- Red centre band -->
-    <path d="M 86,20  C 70,74  84,136  76,145
-             L 130,145
-             C 138,136 124,74  140,20 Z"
+    <!-- Red centre -->
+    <path d="M 82,14  C 66,68  80,130  72,138
+             L 124,138
+             C 132,130 118,68  134,14 Z"
           fill="#CE1126"/>
 
     <!-- Right white swoosh -->
-    <path d="M 140,20 C 124,74 138,136 130,145
-             L 156,145
-             C 164,136 150,74  166,20 Z"
+    <path d="M 134,14 C 118,68 132,130 124,138
+             L 150,138
+             C 158,130 144,68  160,14 Z"
           fill="#FFFFFF"/>
-
-    <!-- Right blue — base layer already covers it -->
   </g>
 
-  <!-- ── Gold cart — color exactly #e8c97a, matching MercadoCR text ── -->
+  <!-- ── Gold only on right + bottom of cart, handle, axle, wheels ───── -->
 
-  <!-- Basket border -->
-  <rect x="20" y="30" width="140" height="108" rx="20" ry="20"
+  <!-- Cart frame: bottom rail + right side + connects to handle -->
+  <path d="M 12,130
+           L 134,130
+           Q 154,130 154,110
+           L 154,66"
         fill="none"
         stroke="#e8c97a"
-        stroke-width="12"/>
+        stroke-width="12"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
 
-  <!-- Handle: attaches upper-right of basket, curves up into hook, drops as grip -->
-  <path d="M 160,68
-           C 176,60 190,50 190,34
-           Q 190,20 174,20"
+  <!-- Handle: curves up from basket right, hooks, drops as grip -->
+  <path d="M 154,66
+           C 170,58 184,48 184,32
+           Q 184,18 168,18"
         fill="none"
         stroke="#e8c97a"
         stroke-width="12"
@@ -50,19 +52,19 @@
         stroke-linejoin="round"/>
 
   <!-- Grip — vertical bar -->
-  <line x1="190" y1="34" x2="190" y2="128"
+  <line x1="184" y1="32" x2="184" y2="118"
         stroke="#e8c97a"
         stroke-width="12"
         stroke-linecap="round"/>
 
   <!-- Axle -->
-  <line x1="44" y1="154" x2="152" y2="154"
+  <line x1="34" y1="150" x2="146" y2="150"
         stroke="#e8c97a"
         stroke-width="11"
         stroke-linecap="round"/>
 
   <!-- Wheels -->
-  <circle cx="64"  cy="172" r="16" fill="#e8c97a"/>
-  <circle cx="132" cy="172" r="16" fill="#e8c97a"/>
+  <circle cx="54"  cy="168" r="16" fill="#e8c97a"/>
+  <circle cx="126" cy="168" r="16" fill="#e8c97a"/>
 
 </svg>
