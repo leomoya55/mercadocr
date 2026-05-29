@@ -30,10 +30,11 @@
 
   <!-- ── Gold only on right + bottom of cart, handle, axle, wheels ───── -->
 
-  <!-- Cart frame: bottom rail + right side + connects to handle -->
-  <path d="M 12,130
+  <!-- Cart frame: rounded U-shape — both bottom corners curved, right side up to handle -->
+  <path d="M 12,108
+           Q 12,130 34,130
            L 134,130
-           Q 154,130 154,110
+           Q 154,130 154,108
            L 154,66"
         fill="none"
         stroke="#e8c97a"
