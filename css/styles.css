@@ -61,8 +61,8 @@ nav {
 }
 
 .logo-img {
-    width: 46px;
-    height: 38px;
+    width: 50px;
+    height: 42px;
     object-fit: contain;
     flex-shrink: 0;
 }
