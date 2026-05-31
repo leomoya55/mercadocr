@@ -84,6 +84,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const showForm     = () => { form?.classList.remove('hidden'); paymentsBox?.classList.add('hidden'); };
   const showPayments = () => { form?.classList.add('hidden');   paymentsBox?.classList.remove('hidden'); };
 
+  // ─── Form enhancements ────────────────────────────────────────────────────
+  const priceInput = document.getElementById('price');
+  const priceHidden = document.getElementById('price-hidden');
+  const descriptionInput = document.getElementById('description');
+  const descriptionCounter = document.getElementById('description-counter');
+  const minDescriptionLength = 20;
+
+  if (priceInput && priceHidden) {
+    priceInput.addEventListener('input', () => {
+      const rawValue = priceInput.value.replace(/[^0-9]/g, '');
+      const numberValue = parseInt(rawValue, 10);
+
+      if (isNaN(numberValue)) {
+        priceInput.value = '';
+        priceHidden.value = '';
+      } else {
+        priceInput.value = numberValue.toLocaleString('es-CR');
+        priceHidden.value = numberValue;
+      }
+    });
+  }
+
+  if (descriptionInput && descriptionCounter) {
+    descriptionInput.addEventListener('input', () => {
+      const currentLength = descriptionInput.value.length;
+      descriptionCounter.textContent = `${currentLength}/${minDescriptionLength} caracteres`;
+      if (currentLength >= minDescriptionLength) {
+        descriptionCounter.classList.add('valid');
+      } else {
+        descriptionCounter.classList.remove('valid');
+      }
+    });
+    // Trigger on load for edit mode
+    descriptionInput.dispatchEvent(new Event('input'));
+  }
+
+
   // ─── Plan UI helpers ──────────────────────────────────────────────────────
 
   function setPlanBar(plan) {
@@ -139,11 +176,14 @@ document.addEventListener('DOMContentLoaded', () => {
     isEditMode = true;
     form.name.value        = listing.name;
     form.description.value = listing.description;
-    form.price.value       = listing.price;
+    priceInput.value       = listing.price.toLocaleString('es-CR');
+    priceHidden.value      = listing.price;
     form.category.value    = listing.category;
     if (form.condition) form.condition.value = listing.condition || '';
     submitButton.textContent = 'Guardar cambios';
     showForm();
+    // Manually trigger input events to update counters
+    descriptionInput.dispatchEvent(new Event('input'));
   };
 
   // ─── Auth state ───────────────────────────────────────────────────────────
@@ -201,7 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
           ? `/api/listings/update/${editId}`
           : '/api/listings/add';
 
-        const response = await authFetch(endpoint, { method: 'POST', body: formData });
+        const response = await authFetch(endpoint, {
+          method: isEditMode ? 'PUT' : 'POST',
+          body: formData,
+        });
 
         if (response.ok) {
           UserStore.invalidate();
@@ -247,33 +290,4 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  const priceInput = document.getElementById("price");
-
-  priceInput.addEventListener("input", (e) => {
-    // First, remove any non-digit characters from the input
-    let value = priceInput.value.replace(/[^0-9]/g, "");
-
-    if (value) {
-      // Convert to a number
-      value = parseInt(value, 10);
-
-      // Enforce a maximum value
-      if (value > 100000000) {
-        value = 100000000;
-      }
-
-      // Format the number with Costa Rican locale separators and update the input
-      // This will add dots for thousands, e.g., 5000 -> 5.000
-      priceInput.value = value.toLocaleString("es-CR");
-    } else {
-      // If the input is empty, keep it empty
-      priceInput.value = "";
-    }
-  });
-
-  const conditionSelect = document.getElementById("condition");
-  conditionSelect.addEventListener('change', (e) => {
-    if (form.condition) form.condition.value = e.target.value;
-  });
 });

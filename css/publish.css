@@ -126,3 +126,16 @@
 }
 
 #publish-upgrade-hint:hover { text-decoration: underline; opacity: 1; }
+
+/* Description character counter */
+.description-counter {
+  font-size: 0.8rem;
+  color: #888;
+  text-align: right;
+  margin-top: 4px;
+}
+
+.description-counter.valid {
+  color: #28a745;
+  font-weight: bold;
+}

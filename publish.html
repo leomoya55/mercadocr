@@ -71,10 +71,14 @@
                 <input type="text" id="name" name="name" required>
 
                 <label for="description">Descripción</label>
-                <textarea id="description" name="description" rows="4" required></textarea>
+                <textarea id="description" name="description" rows="6" required minlength="20"></textarea>
+                <small id="description-counter" class="description-counter">0/20 caracteres</small>
 
                 <label for="price">Precio (₡)</label>
-                <input type="number" id="price" name="price" required>
+                <div class="form-group">
+                    <input type="text" id="price" name="price-display" inputmode="numeric" required>
+                    <input type="hidden" id="price-hidden" name="price">
+                </div>
 
                 <label for="category">Categoría</label>
                 <select id="category" name="category" required>
