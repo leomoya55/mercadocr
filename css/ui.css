@@ -101,6 +101,72 @@
   outline-offset: 2px;
 }
 
+/* ─── Confirm dialog (in-app replacement for window.confirm) ───────────────── */
+.modal-confirm-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.6rem;
+}
+
+.modal-confirm-message {
+  color: #ccc;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 1.6rem;
+}
+
+.modal-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.modal-confirm-actions button {
+  flex: 1 1 auto;
+  min-width: 130px;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-confirm-cancel {
+  background: transparent;
+  color: #ccc;
+  border-color: #444 !important;
+}
+
+.modal-confirm-cancel:hover {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+}
+
+.modal-confirm-ok {
+  background: #e8c97a;
+  color: #0d0d0d;
+}
+
+.modal-confirm-ok:hover {
+  transform: translateY(-2px);
+}
+
+/* Destructive actions (delete, etc.) get a red confirm button */
+.modal-confirm-ok.danger {
+  background: #e05c5c;
+  color: #fff;
+}
+
+.modal-confirm-actions button:focus-visible {
+  outline: 2px solid #e8c97a;
+  outline-offset: 2px;
+}
+
 @keyframes modal-fade {
   from { opacity: 0; }
   to   { opacity: 1; }

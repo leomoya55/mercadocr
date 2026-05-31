@@ -67,3 +67,9 @@
 .dashboard-empty { color: #888; font-size: 0.95rem; padding: 1.5rem 0; text-align: center; }
 .dashboard-empty a { color: #e8c97a; text-decoration: none; }
 .dashboard-empty a:hover { text-decoration: underline; }
+
+.sold-note {
+    font-size: 0.78rem;
+    color: #e08080;
+    margin-top: 0.3rem;
+}

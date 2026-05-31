@@ -96,7 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       document.querySelector('.pricing-cards').after(section);
       document.getElementById('cancel-sub-btn').addEventListener('click', async () => {
-        if (!confirm('¿Cancelar la renovación? Mantendrás el acceso hasta el final del periodo que ya pagaste.')) return;
+        const ok = await Modal.confirm({
+          title: 'Cancelar suscripción',
+          message: 'Mantendrás el acceso hasta el final del periodo que ya pagaste. ¿Deseas cancelar la renovación?',
+          confirmText: 'Cancelar renovación',
+          cancelText: 'Volver',
+          danger: true,
+        });
+        if (!ok) return;
         const cancelBtn = document.getElementById('cancel-sub-btn');
         cancelBtn.disabled = true; cancelBtn.textContent = 'Cancelando...';
         try {

@@ -261,11 +261,19 @@
         );
       }
       if (action === 'delete-listing') {
-        if (!confirm('¿Eliminar este anuncio definitivamente? Esta acción no se puede deshacer.')) return;
-        adminDelete('/api/admin/listings/' + id, function () {
-          Toast.success('Anuncio eliminado.');
-          loadStats();
-          loadListings(listingsPage);
+        Modal.confirm({
+          title: 'Eliminar anuncio',
+          message: 'Se eliminará este anuncio definitivamente. Esta acción no se puede deshacer.',
+          confirmText: 'Eliminar',
+          cancelText: 'Cancelar',
+          danger: true,
+        }).then(function (ok) {
+          if (!ok) return;
+          adminDelete('/api/admin/listings/' + id, function () {
+            Toast.success('Anuncio eliminado.');
+            loadStats();
+            loadListings(listingsPage);
+          });
         });
       }
     });
@@ -360,15 +368,18 @@
       var uid      = sel.dataset.uid;
       var previous = sel.dataset.current;
 
-      if (!confirm('¿Cambiar plan de este usuario a "' + newPlan + '"?')) {
-        sel.value = previous; // revert
-        return;
-      }
-
-      adminPost('/api/admin/users/' + uid + '/plan', { plan: newPlan }, function () {
-        sel.dataset.current = newPlan;
-        Toast.success('Plan actualizado a ' + newPlan + '.');
-        loadStats();
+      Modal.confirm({
+        title: 'Cambiar plan',
+        message: '¿Cambiar el plan de este usuario a "' + newPlan + '"?',
+        confirmText: 'Cambiar',
+        cancelText: 'Cancelar',
+      }).then(function (ok) {
+        if (!ok) { sel.value = previous; return; } // revert on cancel
+        adminPost('/api/admin/users/' + uid + '/plan', { plan: newPlan }, function () {
+          sel.dataset.current = newPlan;
+          Toast.success('Plan actualizado a ' + newPlan + '.');
+          loadStats();
+        });
       });
     });
 

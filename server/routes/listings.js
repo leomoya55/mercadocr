@@ -382,8 +382,10 @@ router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res)
 
 /**
  * POST /mark-sold/:id
- * Sets status = 'sold', which immediately frees a slot in the active count
- * (getActiveCount excludes sold listings via { status: { $ne: 'sold' } }).
+ * Sets status = 'sold' (frees a slot immediately — getActiveCount excludes sold)
+ * and stamps soldAt. The listing stays visible in the seller's panel for a week,
+ * then the cleanup-sold cron deletes the document and its Cloudinary images so
+ * sold listings never accumulate in the database / image storage.
  */
 router.post('/mark-sold/:id', verifyToken, async (req, res) => {
   try {
@@ -393,6 +395,7 @@ router.post('/mark-sold/:id', verifyToken, async (req, res) => {
     if (listing.author !== uid) return res.status(403).json('Not authorized');
 
     listing.status = 'sold';
+    listing.soldAt = new Date();
     await listing.save();
     res.json('Listing marked as sold');
   } catch (err) {

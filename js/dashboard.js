@@ -30,14 +30,25 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `<button data-mark-sold="${listing._id}" class="btn-mark-sold">Marcar vendido</button>`
         : '';
 
+      // Sold listings auto-delete a week after being marked sold.
+      let soldNote = '';
+      if (isSold) {
+        const removalMs = (listing.soldAt ? new Date(listing.soldAt).getTime() : Date.now())
+          + 7 * 24 * 60 * 60 * 1000;
+        const daysLeft = Math.max(0, Math.ceil((removalMs - Date.now()) / (24 * 60 * 60 * 1000)));
+        soldNote = `<div class="sold-note">Se elimina en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}</div>`;
+      }
+
+      const photo = listing.photos && listing.photos[0] ? escapeHtml(listing.photos[0]) : '';
       card.innerHTML = `
-        <img src="${escapeHtml(listing.photos[0])}" alt="${escapeHtml(listing.name)}"${isSold ? ' style="opacity:0.55"' : ''}>
+        <img src="${photo}" alt="${escapeHtml(listing.name)}"${isSold ? ' style="opacity:0.55"' : ''}>
         <div class="listing-item-content">
           <div class="listing-item-title">${escapeHtml(listing.name)}</div>
           <div class="listing-item-meta">
             <div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>
             ${featuredBadge}${soldBadge}
           </div>
+          ${soldNote}
           ${listing.provincia ? `<div class="listing-item-location">📍 ${escapeHtml(listing.provincia)}</div>` : ''}
           <div class="dashboard-actions">
             ${editBtn}
@@ -57,7 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.querySelectorAll('[data-mark-sold]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('¿Marcar este anuncio como vendido? Quedará archivado y liberará un espacio para publicar otro.')) return;
+        const ok = await Modal.confirm({
+          title: 'Marcar como vendido',
+          message: 'Se mostrará como “Vendido” en tu panel durante una semana y luego se eliminará automáticamente. Esto libera un espacio para publicar otro anuncio.',
+          confirmText: 'Marcar vendido',
+          cancelText: 'Cancelar',
+        });
+        if (!ok) return;
         btn.disabled = true;
         btn.textContent = 'Marcando...';
         try {
@@ -73,7 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.querySelectorAll('[data-delete]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('¿Seguro que deseas eliminar este anuncio?')) return;
+        const ok = await Modal.confirm({
+          title: 'Eliminar anuncio',
+          message: '¿Seguro que deseas eliminar este anuncio? Esta acción no se puede deshacer.',
+          confirmText: 'Eliminar',
+          cancelText: 'Cancelar',
+          danger: true,
+        });
+        if (!ok) return;
         btn.disabled = true;
         btn.textContent = 'Eliminando...';
         try {

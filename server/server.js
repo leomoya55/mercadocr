@@ -21,7 +21,7 @@ const port = process.env.PORT || 3001;
 
 // In production, never auto-build indexes on connect — on serverless that would
 // fire on every cold start and add latency/timeout risk. Indexes are created
-// once via a guarded migration (ensure_indexes_v2) in runStartupMigrations().
+// once via a guarded migration (ensure_indexes_v3) in runStartupMigrations().
 mongoose.set('autoIndex', process.env.NODE_ENV !== 'production');
 
 // ─── Security headers ─────────────────────────────────────────────────────────
@@ -315,7 +315,7 @@ async function runStartupMigrations() {
     //     duplicate-email blocking the unique index) is logged but never blocks
     //     the others or the server. Bump the version suffix to force a rebuild
     //     after adding new indexes.
-    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v2' });
+    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v3' });
     if (!indexesRan) {
       const models = {
         User:           require('./models/user.model'),
@@ -337,7 +337,7 @@ async function runStartupMigrations() {
       // Only mark complete if every model succeeded, so a transient failure
       // (e.g. a duplicate that still needs cleanup) retries on the next cold start.
       if (allOk) {
-        await migrationsCol.insertOne({ name: 'ensure_indexes_v2', ranAt: new Date() });
+        await migrationsCol.insertOne({ name: 'ensure_indexes_v3', ranAt: new Date() });
       }
     }
 

@@ -21,9 +21,18 @@ const listingSchema = new mongoose.Schema({
   views:       { type: Number, default: 0 },
   viewedBy:    [{ type: String }],               // Firebase UIDs — one entry per unique viewer
   status:      { type: String, enum: ['active', 'sold'], default: 'active' },
+  // When the listing was marked sold. Sold listings stay visible in the seller's
+  // panel for a week, then the cleanup-sold cron deletes the doc + Cloudinary
+  // images. Null for active listings.
+  soldAt:      { type: Date, default: null },
 }, {
   timestamps: true,
 });
+
+/**
+ * Powers the cleanup-sold cron: find sold listings whose week has elapsed.
+ */
+listingSchema.index({ status: 1, soldAt: 1 });
 
 /**
  * Compound index on (author, status).

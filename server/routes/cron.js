@@ -18,8 +18,10 @@
 
 const router  = require('express').Router();
 const User    = require('../models/user.model');
+const Listing = require('../models/listing.model');
 const ProcessedEvent = require('../models/processedEvent.model');
 const { stripe, tierFromSubscription, getPeriodEnd, ACTIVE_STATUSES } = require('../config/stripe');
+const { cloudinary, configureCloudinary, getPublicIdFromUrl } = require('../config/cloudinary');
 const { captureException } = require('../config/sentry');
 
 // ─── Auth guard for every cron route ──────────────────────────────────────────
@@ -120,6 +122,47 @@ router.get('/downgrade-expired', async (req, res) => {
 
   console.log(JSON.stringify({ job: 'downgrade-expired', candidates: candidates.length, downgraded, refreshed, skipped, errors }));
   res.json({ ok: true, candidates: candidates.length, downgraded, refreshed, errors });
+});
+
+/**
+ * GET /api/cron/cleanup-sold
+ *
+ * Deletes listings that have been marked sold for more than a week, removing
+ * both the MongoDB document and the Cloudinary images. This keeps sold listings
+ * visible in the seller's panel for ~7 days, then reclaims all the data so the
+ * database and image storage never accumulate sold items indefinitely.
+ */
+router.get('/cleanup-sold', async (req, res) => {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const candidates = await Listing.find({
+    status: 'sold',
+    soldAt: { $ne: null, $lt: cutoff },
+  }).select('_id photos').limit(500).lean();
+
+  let deleted = 0, imagesDeleted = 0, errors = 0;
+  if (candidates.length) configureCloudinary();
+
+  for (const l of candidates) {
+    try {
+      if (Array.isArray(l.photos) && l.photos.length) {
+        const publicIds = l.photos.map(getPublicIdFromUrl).filter(Boolean);
+        if (publicIds.length) {
+          await cloudinary.api.delete_resources(publicIds);
+          imagesDeleted += publicIds.length;
+        }
+      }
+      await Listing.deleteOne({ _id: l._id });
+      deleted++;
+    } catch (err) {
+      console.error('[cron] cleanup-sold failed for', l._id, err.message);
+      captureException(err, { where: 'cron_cleanup_sold', listingId: String(l._id) });
+      errors++;
+    }
+  }
+
+  console.log(JSON.stringify({ job: 'cleanup-sold', candidates: candidates.length, deleted, imagesDeleted, errors }));
+  res.json({ ok: true, candidates: candidates.length, deleted, imagesDeleted, errors });
 });
 
 module.exports = router;

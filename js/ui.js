@@ -127,6 +127,62 @@
         _prevFocus = null;
       }
     },
+
+    /**
+     * In-app replacement for window.confirm(). Returns a Promise<boolean>:
+     * resolves true if the user confirms, false if they cancel / dismiss
+     * (Cancelar button, close X, backdrop click, or ESC).
+     *
+     * opts: { title, message, confirmText, cancelText, danger }
+     */
+    confirm: function (opts) {
+      opts = opts || {};
+      return new Promise(function (resolve) {
+        var confirmText = opts.confirmText || 'Confirmar';
+        var cancelText  = opts.cancelText  || 'Cancelar';
+        var btnClass    = opts.danger ? 'modal-confirm-ok danger' : 'modal-confirm-ok';
+
+        var titleHtml = opts.title
+          ? '<div class="modal-confirm-title">' + escapeHtml(opts.title) + '</div>'
+          : '';
+
+        window.Modal.show({
+          ariaLabel: opts.title || 'Confirmar acción',
+          html:
+            titleHtml +
+            '<div class="modal-confirm-message">' + escapeHtml(opts.message || '') + '</div>' +
+            '<div class="modal-confirm-actions">' +
+              '<button type="button" class="modal-confirm-cancel" id="ui-confirm-cancel">' +
+                escapeHtml(cancelText) +
+              '</button>' +
+              '<button type="button" class="' + btnClass + '" id="ui-confirm-ok">' +
+                escapeHtml(confirmText) +
+              '</button>' +
+            '</div>',
+          // X button / backdrop click both count as cancel
+          onClose: function () { settle(false); },
+        });
+
+        var settled = false;
+        function settle(value) {
+          if (settled) return;
+          settled = true;
+          document.removeEventListener('keydown', onEsc);
+          window.Modal.hide();
+          resolve(value);
+        }
+        // ESC: Modal.show's own handler removes the overlay but never resolves
+        // this promise, so we listen here too and settle as cancel.
+        function onEsc(e) { if (e.key === 'Escape') settle(false); }
+        document.addEventListener('keydown', onEsc);
+
+        var okBtn     = document.getElementById('ui-confirm-ok');
+        var cancelBtn = document.getElementById('ui-confirm-cancel');
+        if (okBtn)     okBtn.addEventListener('click', function () { settle(true); });
+        if (cancelBtn) cancelBtn.addEventListener('click', function () { settle(false); });
+        if (okBtn)     setTimeout(function () { okBtn.focus(); }, 70);
+      });
+    },
   };
 
   // ESC key closes modal
