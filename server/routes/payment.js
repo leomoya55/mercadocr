@@ -79,6 +79,7 @@ async function syncSubscriptionToUser(uid, subscription, { downgrade = false } =
       { firebaseUid: uid },
       { $set: {
           plan: 'free',
+          compedPlan: false,
           subscriptionStatus: subscription?.status || 'canceled',
           stripeSubscriptionId: null,
           currentPeriodEnd: null,
@@ -96,6 +97,9 @@ async function syncSubscriptionToUser(uid, subscription, { downgrade = false } =
     { firebaseUid: uid },
     { $set: {
         plan: tier,
+        // A real Stripe purchase is never a comp — clear the flag so renewal is
+        // enforced even if this user was previously granted a comp plan.
+        compedPlan: false,
         subscriptionStatus: subscription.status,
         stripeSubscriptionId: subscription.id,
         stripeCustomerId: subscription.customer,

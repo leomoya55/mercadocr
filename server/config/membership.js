@@ -18,9 +18,10 @@
  * SOURCE OF TRUTH PRECEDENCE
  *   1. Owner email           → always 'pro'.
  *   2. Stored free           → 'free'.
- *   3. Paid tier, BUT only if subscriptionStatus is active/trialing AND the paid
+ *   3. Admin comp grant      → keep the granted paid tier forever (no Stripe sub).
+ *   4. Paid tier, BUT only if subscriptionStatus is active/trialing AND the paid
  *      period has not ended (with a small grace for webhook/clock lag).
- *   4. Otherwise             → 'free' (expired / past_due / canceled / unknown).
+ *   5. Otherwise             → 'free' (expired / past_due / canceled / unknown).
  */
 
 const { isOwner, getPlan, PLAN_RANK } = require('./plans');
@@ -72,7 +73,13 @@ function getEffectiveMembership(user, emailHint) {
     return result('free', { reason: 'stored_free' });
   }
 
-  // 3. Paid tier — validate against the persisted Stripe state.
+  // 3. Admin comp grant — a paid plan with no Stripe subscription, granted from
+  //    the admin dashboard. Never expires; it is not tied to any billing cycle.
+  if (user?.compedPlan) {
+    return result(storedPlan, { active: true, reason: 'admin_comp' });
+  }
+
+  // 4. Paid tier — validate against the persisted Stripe state.
   const status = user?.subscriptionStatus || null;
   // currentPeriodEnd is the canonical field; planExpiresAt is the legacy field
   // written by the old webhook. Prefer the new one, fall back for old data.
@@ -94,7 +101,7 @@ function getEffectiveMembership(user, emailHint) {
     });
   }
 
-  // 4. Stored a paid tier but it's no longer valid → effective free.
+  // 5. Stored a paid tier but it's no longer valid → effective free.
   return result('free', {
     status,
     currentPeriodEnd: periodEnd,

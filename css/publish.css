@@ -59,8 +59,40 @@
 #publish-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
     margin-top: 2rem;
+}
+
+/* Main content wraps the fields column and the image preview. Single column —
+   the form is centered at max-width:600px, which reads well on PC and mobile. */
+.publish-main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.publish-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Each labelled field stacks its label above its control. */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+/* Two fields side-by-side on PC (e.g. Condición + Precio); stacks on mobile. */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-row .form-group {
+    min-width: 0; /* lets grid children shrink instead of overflowing */
 }
 
 #publish-form label {
@@ -68,12 +100,27 @@
 }
 
 #publish-form input, #publish-form textarea, #publish-form select {
+    width: 100%;
+    box-sizing: border-box;
     padding: 0.8rem;
     border-radius: 5px;
     border: 1px solid #e8c97a;
     background-color: #1a1a1a;
     color: #fff;
     font-size: 1rem;
+    /* 16px font-size on inputs prevents iOS Safari from auto-zooming on focus */
+    font-family: 'Inter', sans-serif;
+}
+
+#publish-form textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+/* File input: keep it inside the card on small screens */
+#publish-form input[type="file"] {
+    padding: 0.6rem;
+    font-size: 0.9rem;
 }
 
 #publish-form small {
@@ -86,11 +133,26 @@
 
 #submit-button {
     margin-top: 1rem;
+    padding: 0.9rem 2rem;
+    background-color: #e8c97a;
+    color: #0d0d0d;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
     cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#submit-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(232, 201, 122, 0.3);
 }
 
 #submit-button:disabled {
     background-color: #555;
+    color: #aaa;
     cursor: not-allowed;
 }
 
@@ -138,4 +200,56 @@
 .description-counter.valid {
   color: #28a745;
   font-weight: bold;
+}
+
+/* ─── Image preview thumbnails ───────────────────────────────────────────── */
+.publish-image-preview:empty,
+#image-preview-container:empty {
+    display: none;
+}
+
+#image-preview-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 0.6rem;
+}
+
+.preview-thumb {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #333;
+    background-color: #141414;
+}
+
+.preview-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .publish-page {
+        padding: 1.25rem 1rem;
+    }
+
+    /* Stack the Condición + Precio pair on narrow screens */
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .publish-payments {
+        grid-template-columns: 1fr;
+    }
+
+    #submit-button {
+        width: 100%;
+    }
+
+    #image-preview-container {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    }
 }

@@ -200,6 +200,8 @@ nav a:hover {
 }
 
 .category-item {
+    display: block;
+    text-decoration: none;
     background-color: #1a1a1a;
     padding: 2rem;
     border-radius: 8px;

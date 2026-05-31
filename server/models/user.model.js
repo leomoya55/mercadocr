@@ -8,6 +8,10 @@ const userSchema = new mongoose.Schema({
     phone:                { type: String, default: '' },
     provincia:            { type: String, default: '' },
     plan:                 { type: String, enum: ['free', 'basic', 'pro'], default: 'free' },
+    // True when an admin manually granted this paid plan as a comp (no Stripe
+    // subscription). Comped plans never expire and are skipped by the downgrade
+    // cron. Purchased plans leave this false and must renew via Stripe.
+    compedPlan:           { type: Boolean, default: false },
     freeListingUsed:      { type: Boolean, default: false },
     singlePostCredits:    { type: Number, default: 0, min: 0 },
     listingsCount:        { type: Number, default: 0 },

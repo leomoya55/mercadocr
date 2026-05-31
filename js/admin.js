@@ -333,6 +333,9 @@
             '<option value="basic"' + (u.plan === 'basic' ? ' selected' : '') + '>Basic</option>' +
             '<option value="pro"'   + (u.plan === 'pro'   ? ' selected' : '') + '>Pro</option>' +
           '</select>' +
+          (u.compedPlan && u.plan !== 'free'
+            ? ' <span class="plan-comp-badge" title="Plan de cortesía otorgado por admin — no expira">Cortesía</span>'
+            : '') +
         '</td>' +
         '<td>' +
           '<span class="credits-val">' + (u.singlePostCredits || 0) + '</span>' +

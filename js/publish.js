@@ -120,6 +120,30 @@ document.addEventListener('DOMContentLoaded', () => {
     descriptionInput.dispatchEvent(new Event('input'));
   }
 
+  // ─── Live image preview ─────────────────────────────────────────────────────
+  const imagesInput      = document.getElementById('images');
+  const previewContainer = document.getElementById('image-preview-container');
+
+  function renderImagePreviews() {
+    if (!previewContainer) return;
+    previewContainer.innerHTML = '';
+    const files = imagesInput ? Array.from(imagesInput.files || []) : [];
+    files.forEach((file) => {
+      if (!file.type || !file.type.startsWith('image/')) return;
+      const url   = URL.createObjectURL(file);
+      const thumb = document.createElement('div');
+      thumb.className = 'preview-thumb';
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = file.name || '';
+      img.addEventListener('load', () => URL.revokeObjectURL(url));
+      thumb.appendChild(img);
+      previewContainer.appendChild(thumb);
+    });
+  }
+
+  if (imagesInput) imagesInput.addEventListener('change', renderImagePreviews);
+
 
   // ─── Plan UI helpers ──────────────────────────────────────────────────────
 
@@ -269,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             // Reset the form so "Publish another" starts fresh
             form.reset();
+            if (previewContainer) previewContainer.innerHTML = '';
           }
 
         } else if (response.status === 402) {

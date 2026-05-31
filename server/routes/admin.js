@@ -225,12 +225,15 @@ router.post('/users/:uid/plan', async (req, res) => {
     // with null status/period as a legacy/comp grant and keeps it (never expires).
     const set = { plan };
     if (plan === 'free') {
+      set.compedPlan         = false;
       set.subscriptionStatus = 'canceled';
       set.currentPeriodEnd   = null;
       set.planExpiresAt      = null;
       set.cancelAtPeriodEnd  = false;
     } else {
-      // comp grant: detach from any Stripe state so the resolver keeps it active.
+      // comp grant: flag it and detach from any Stripe state so the resolver
+      // keeps it active forever and the downgrade cron never touches it.
+      set.compedPlan         = true;
       set.subscriptionStatus = null;
       set.currentPeriodEnd   = null;
       set.planExpiresAt      = null;

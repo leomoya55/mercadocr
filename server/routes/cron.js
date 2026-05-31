@@ -52,6 +52,8 @@ router.get('/downgrade-expired', async (req, res) => {
 
   const candidates = await User.find({
     plan: { $in: ['basic', 'pro'] },
+    // Admin comp grants never expire — exclude them from downgrade reconciliation.
+    compedPlan: { $ne: true },
     // either no period stored, or it lapsed beyond the grace window
     $or: [
       { currentPeriodEnd: { $lt: cutoff } },

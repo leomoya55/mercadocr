@@ -296,6 +296,21 @@
 
 .plan-select-inline:focus { outline: 1px solid #e8c97a; }
 
+.plan-comp-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #11331a;
+  color: #7ae89a;
+  border: 1px solid #1f5a33;
+  vertical-align: middle;
+}
+
 /* ─── Admin link ────────────────────────────────────────────────────────────── */
 
 .admin-link { color: #e8c97a; text-decoration: none; }

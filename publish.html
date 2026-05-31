@@ -77,22 +77,24 @@
                             <label for="category">Categoría</label>
                             <select id="category" name="category" required>
                                 <option value="" disabled selected>Selecciona una categoría</option>
-                                <option value="electronics">Electrónicos</option>
-                                <option value="vehicles">Vehículos</option>
-                                <option value="home">Hogar</option>
-                                <option value="sports">Deportes</option>
-                                <option value="fashion">Moda</option>
-                                <option value="real_estate">Bienes Raíces</option>
-                                <option value="services">Servicios</option>
-                                <option value="other">Otros</option>
+                                <option value="Ropa y accesorios">Ropa y accesorios</option>
+                                <option value="Electrónica">Electrónica</option>
+                                <option value="Hogar y muebles">Hogar y muebles</option>
+                                <option value="Vehículos">Vehículos</option>
+                                <option value="Servicios">Servicios</option>
+                                <option value="Otros">Otros</option>
                             </select>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="condition">Condición</label>
                                 <select id="condition" name="condition">
+                                    <option value="" disabled selected>Selecciona el estado</option>
                                     <option value="new">Nuevo</option>
-                                    <option value="used">Usado</option>
+                                    <option value="like_new">Como nuevo</option>
+                                    <option value="good">Buen estado</option>
+                                    <option value="fair">Estado regular</option>
+                                    <option value="regular">Para reparar</option>
                                 </select>
                                 <input type="hidden" id="condition-hidden" name="condition_hidden">
                             </div>
@@ -134,6 +136,6 @@
     <script src="js/user-store.js?v=12"></script>
     <script src="js/ui.js?v=12"></script>
     <script src="js/auth-redirect.js?v=12"></script>
-    <script src="js/publish.js?v=12"></script>
+    <script src="js/publish.js?v=13"></script>
 </body>
 </html>
