@@ -87,7 +87,25 @@ router.put('/me/profile', verifyToken, ensureUser, async (req, res) => {
     const { nombre, apellido, phone, provincia } = req.body;
     const cleanPhone = (phone || '').trim();
 
-    if (cleanPhone) {
+    // ── Phone is LOCKED once set ────────────────────────────────────────────
+    // The phone number is the seller's WhatsApp shown on every listing, so it's
+    // treated as semi-immutable: a user may set it once if it's currently empty,
+    // but cannot change it afterward through self-service (prevents account
+    // hijack / contact-swap scams and bait-and-switch listings). Changes are
+    // handled manually via support. Enforced here on the SERVER — the readonly
+    // field in settings.html is only a UX hint and can be bypassed.
+    const hasPhone   = !!(req.dbUser?.phone && req.dbUser.phone.trim());
+    const wantsPhone = phone !== undefined && cleanPhone !== (req.dbUser?.phone || '').trim();
+    if (hasPhone && wantsPhone) {
+      return res.status(403).json({
+        error: 'phone_locked',
+        message: 'El número de teléfono no se puede cambiar aquí. Escríbenos a soporte para modificarlo.',
+      });
+    }
+
+    // Only run the uniqueness check when we will actually write a (new) phone.
+    const willSetPhone = !hasPhone && !!cleanPhone;
+    if (willSetPhone) {
       const conflict = await User.findOne({ phone: cleanPhone, firebaseUid: { $ne: uid } })
         .select('_id').lean();
       if (conflict) {
@@ -98,7 +116,7 @@ router.put('/me/profile', verifyToken, ensureUser, async (req, res) => {
     const set = {};
     if (nombre    !== undefined) set.nombre    = nombre;
     if (apellido  !== undefined) set.apellido  = apellido;
-    if (phone     !== undefined) set.phone     = cleanPhone;
+    if (willSetPhone)            set.phone     = cleanPhone;
     if (provincia !== undefined) set.provincia = provincia;
 
     const updated = await User.findOneAndUpdate(
@@ -111,14 +129,16 @@ router.put('/me/profile', verifyToken, ensureUser, async (req, res) => {
     // Runs fire-and-forget so it never blocks the settings save response.
     // Only touches listings where the field is currently blank — never overwrites
     // a non-empty value (respects any per-listing overrides set elsewhere).
+    // Uses the user's effective phone (newly set OR the existing locked one).
+    const effectivePhone = willSetPhone ? cleanPhone : (req.dbUser?.phone || '').trim();
     const listingSync = {};
-    if (cleanPhone) listingSync.contact  = cleanPhone;
-    if (provincia)  listingSync.provincia = provincia;
+    if (effectivePhone) listingSync.contact  = effectivePhone;
+    if (provincia)      listingSync.provincia = provincia;
 
     if (Object.keys(listingSync).length) {
       const orClauses = [];
-      if (cleanPhone) orClauses.push({ contact:  { $in: ['', null] } });
-      if (provincia)  orClauses.push({ provincia: { $in: ['', null] } });
+      if (effectivePhone) orClauses.push({ contact:  { $in: ['', null] } });
+      if (provincia)      orClauses.push({ provincia: { $in: ['', null] } });
 
       Listing.updateMany(
         { author: uid, status: { $ne: 'sold' }, $or: orClauses },
@@ -237,7 +257,19 @@ router.put('/:uid/profile', verifyToken, ensureUser, async (req, res) => {
     const { nombre, apellido, phone, provincia } = req.body;
     const cleanPhone = (phone || '').trim();
 
-    if (cleanPhone) {
+    // Phone is LOCKED once set — settable once when empty, never changed via
+    // self-service afterward. See /me/profile above for the full rationale.
+    const hasPhone   = !!(req.dbUser?.phone && req.dbUser.phone.trim());
+    const wantsPhone = phone !== undefined && cleanPhone !== (req.dbUser?.phone || '').trim();
+    if (hasPhone && wantsPhone) {
+      return res.status(403).json({
+        error: 'phone_locked',
+        message: 'El número de teléfono no se puede cambiar aquí. Escríbenos a soporte para modificarlo.',
+      });
+    }
+
+    const willSetPhone = !hasPhone && !!cleanPhone;
+    if (willSetPhone) {
       const conflict = await User.findOne({ phone: cleanPhone, firebaseUid: { $ne: uid } })
         .select('_id').lean();
       if (conflict) {
@@ -248,7 +280,7 @@ router.put('/:uid/profile', verifyToken, ensureUser, async (req, res) => {
     const set = {};
     if (nombre    !== undefined) set.nombre    = nombre;
     if (apellido  !== undefined) set.apellido  = apellido;
-    if (phone     !== undefined) set.phone     = cleanPhone;
+    if (willSetPhone)            set.phone     = cleanPhone;
     if (provincia !== undefined) set.provincia = provincia;
 
     const updated = await User.findOneAndUpdate(
@@ -258,14 +290,15 @@ router.put('/:uid/profile', verifyToken, ensureUser, async (req, res) => {
     );
 
     // Back-fill active listings with empty contact/provincia (same as /me/profile)
+    const effectivePhone = willSetPhone ? cleanPhone : (req.dbUser?.phone || '').trim();
     const listingSync = {};
-    if (cleanPhone) listingSync.contact  = cleanPhone;
-    if (provincia)  listingSync.provincia = provincia;
+    if (effectivePhone) listingSync.contact  = effectivePhone;
+    if (provincia)      listingSync.provincia = provincia;
 
     if (Object.keys(listingSync).length) {
       const orClauses = [];
-      if (cleanPhone) orClauses.push({ contact:  { $in: ['', null] } });
-      if (provincia)  orClauses.push({ provincia: { $in: ['', null] } });
+      if (effectivePhone) orClauses.push({ contact:  { $in: ['', null] } });
+      if (provincia)      orClauses.push({ provincia: { $in: ['', null] } });
 
       Listing.updateMany(
         { author: uid, status: { $ne: 'sold' }, $or: orClauses },

@@ -29,6 +29,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Phone is the WhatsApp number shown on every listing — lock it once set.
+    // This is a UX hint only; the server (PUT /me/profile) is the real enforcer.
+    function lockPhoneField() {
+        const phoneInput = profileForm['phone'];
+        if (!phoneInput) return;
+        phoneInput.readOnly = true;
+        phoneInput.style.opacity = '0.5';
+        phoneInput.style.cursor  = 'not-allowed';
+        phoneInput.title = 'El teléfono no puede modificarse aquí. Escríbenos a soporte para cambiarlo.';
+        if (!document.getElementById('phone-lock-note')) {
+            const note = document.createElement('p');
+            note.id = 'phone-lock-note';
+            note.style.cssText = 'font-size:0.82rem;color:#888;margin-top:-0.5rem;';
+            note.innerHTML = 'Para cambiar tu número escríbenos a <a href="mailto:soporte@mercadocr.com" style="color:#e8c97a;">soporte@mercadocr.com</a>.';
+            phoneInput.after(note);
+        }
+    }
+
     // ─── Load profile ─────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (user) => {
         if (!user) {
@@ -56,6 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
             profileForm['provincia'].value = profile.provincia || '';
 
             if (nombre && apellido) lockNameFields();
+            // Lock the phone field only if one is already saved (settable once).
+            if (profile.phone && profile.phone.trim()) lockPhoneField();
         } catch (err) {
             console.error('[settings] profile load failed:', err);
             // Fallback to Firebase displayName if API is down
