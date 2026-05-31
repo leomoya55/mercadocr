@@ -41,3 +41,25 @@
     color: #e8c97a;
     font-weight: bold;
 }
+
+.auth-links a {
+  color: var(--primary-color);
+  text-decoration: none;
+  margin: 10px 0;
+  display: block;
+}
+
+.auth-links a:hover {
+  text-decoration: underline;
+}
+
+.forgot-password-link {
+  font-size: 0.9rem;
+  text-align: right;
+  width: 100%;
+}
+
+.status-message {
+  margin-top: 15px;
+  padding: 10px;
+}
