@@ -247,4 +247,33 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  const priceInput = document.getElementById("price");
+
+  priceInput.addEventListener("input", (e) => {
+    // First, remove any non-digit characters from the input
+    let value = priceInput.value.replace(/[^0-9]/g, "");
+
+    if (value) {
+      // Convert to a number
+      value = parseInt(value, 10);
+
+      // Enforce a maximum value
+      if (value > 100000000) {
+        value = 100000000;
+      }
+
+      // Format the number with Costa Rican locale separators and update the input
+      // This will add dots for thousands, e.g., 5000 -> 5.000
+      priceInput.value = value.toLocaleString("es-CR");
+    } else {
+      // If the input is empty, keep it empty
+      priceInput.value = "";
+    }
+  });
+
+  const conditionSelect = document.getElementById("condition");
+  conditionSelect.addEventListener('change', (e) => {
+    if (form.condition) form.condition.value = e.target.value;
+  });
 });
