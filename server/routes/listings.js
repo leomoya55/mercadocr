@@ -376,6 +376,7 @@ router.post('/mark-sold/:id', verifyToken, async (req, res) => {
  */
 router.post('/delete/:id', verifyToken, async (req, res) => {
   try {
+    configureCloudinary(); // Ensure Cloudinary is configured
     const listing = await Listing.findOne({ _id: req.params.id, author: req.uid });
     if (!listing) {
       return res.status(404).json('Listing not found or you do not have permission to delete it.');

@@ -1,14 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { cloudinary } = require('./config/cloudinary'); // Import the unconfigured object
+// const { cloudinary } = require('./config/cloudinary'); // No longer needed here
 
 // --- Centralized Cloudinary Configuration ---
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Moved to on-demand configuration in routes
+// cloudinary.config({ ... });
 // -----------------------------------------
 
 const app = express();
