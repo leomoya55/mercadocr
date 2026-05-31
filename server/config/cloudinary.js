@@ -2,11 +2,8 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Do NOT configure here. We will configure in server.js
+// cloudinary.config({ ... });
 
 // Helper to extract public_id from a Cloudinary URL
 function getPublicIdFromUrl(url) {
@@ -38,7 +35,7 @@ const storage = new CloudinaryStorage({
 });
 
 module.exports = {
-  cloudinary,
+  cloudinary, // Export the unconfigured cloudinary object
   storage,
   upload: multer({
     storage,

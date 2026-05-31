@@ -1,20 +1,18 @@
 require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { cloudinary } = require('./config/cloudinary'); // Import the unconfigured object
 
-const express  = require('express');
-const mongoose = require('mongoose');
-const cors     = require('cors');
-const rateLimit = require('express-rate-limit');
-const path     = require('path');
-const fs       = require('fs');
-const dns      = require('dns').promises;
+// --- Centralized Cloudinary Configuration ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+// -----------------------------------------
 
-// Optional security dependencies — skip gracefully if not yet installed
-let helmet, mongoSanitize;
-try { helmet       = require('helmet');                  } catch { /* not installed yet */ }
-try { mongoSanitize = require('express-mongo-sanitize'); } catch { /* not installed yet */ }
-
-const app  = express();
-const port = process.env.PORT || 5000;
+const app = express();
+const PORT = process.env.PORT || 3001;
 
 // In production, never auto-build indexes on connect — on serverless that would
 // fire on every cold start and add latency/timeout risk. Indexes are created
