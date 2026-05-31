@@ -159,21 +159,39 @@ router.post('/ensure', verifyToken, async (req, res) => {
     }
 
     // Atomic upsert — $setOnInsert only fires when inserting a new document
-    let user = await User.findOneAndUpdate(
-      { firebaseUid: uid },
-      {
-        $setOnInsert: {
-          email,
-          nombre:            nombre    || '',
-          apellido:          apellido  || '',
-          phone:             cleanPhone,
-          provincia:         provincia || '',
-          plan:              owner ? 'pro' : 'free',
-          singlePostCredits: 0,
+    let user;
+    try {
+      user = await User.findOneAndUpdate(
+        { firebaseUid: uid },
+        {
+          $setOnInsert: {
+            email,
+            nombre:            nombre    || '',
+            apellido:          apellido  || '',
+            phone:             cleanPhone,
+            provincia:         provincia || '',
+            plan:              owner ? 'pro' : 'free',
+            singlePostCredits: 0,
+          },
         },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } catch (err) {
+      // E11000: a profile with this email already exists under a DIFFERENT
+      // firebaseUid (e.g. the user deleted their Firebase account and is
+      // re-registering with the same email, but the old DB doc lingers). The
+      // token's email is verified → same person. Reclaim that doc by re-pointing
+      // it to the new uid instead of failing registration with a 500. The
+      // back-fill below then fills in the freshly-submitted name/phone/provincia.
+      if (err && err.code === 11000 && email) {
+        user = await User.findOneAndUpdate(
+          { email, firebaseUid: { $ne: uid } },
+          { $set: { firebaseUid: uid, ...(owner ? { plan: 'pro' } : {}) } },
+          { new: true }
+        );
+      }
+      if (!user) throw err; // not a reclaimable collision — surface the real error
+    }
 
     // For existing users: back-fill any registration fields that are still empty
     const toSet = {};

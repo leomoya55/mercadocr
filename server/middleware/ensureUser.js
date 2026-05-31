@@ -81,6 +81,33 @@ const ensureUser = async (req, res, next) => {
 
     next();
   } catch (err) {
+    // ── E11000 recovery: an existing profile already holds this email under a
+    //    DIFFERENT firebaseUid. This happens when a Firebase account is deleted
+    //    and recreated (same verified email, brand-new UID): the upsert above
+    //    can't match on firebaseUid, tries to INSERT, and collides on the unique
+    //    email index. The token's email is cryptographically verified, so it is
+    //    the same person — reclaim the existing profile by re-pointing it to the
+    //    current UID instead of bricking the account with a 500.
+    //
+    //    Without this, every /me, /listings/add, and /payment call for that user
+    //    fails forever. This is the durable fix for that whole class of failure.
+    if (err && err.code === 11000 && req.email) {
+      try {
+        const reclaimed = await User.findOneAndUpdate(
+          { email: req.email, firebaseUid: { $ne: req.uid } },
+          { $set: { firebaseUid: req.uid, ...(isOwner(req.email) ? { plan: 'pro' } : {}) } },
+          { new: true }
+        );
+        if (reclaimed) {
+          console.warn('[ensureUser] reclaimed profile for', req.email, '→ uid', req.uid);
+          req.dbUser = reclaimed;
+          return next();
+        }
+      } catch (reclaimErr) {
+        console.error('[ensureUser] reclaim failed:', reclaimErr.name, '|', reclaimErr.message);
+      }
+    }
+
     // Log the full error so the real message is visible in server logs
     console.error('[ensureUser] ERROR:', err.name, '|', err.message);
     res.status(500).json({
