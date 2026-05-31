@@ -66,46 +66,59 @@
                     <button type="button" class="cta-button secondary" id="pro-button">Hacerme Pro</button>
                 </div>
             </div>
-            <form id="publish-form">
-                <label for="name">Nombre del producto</label>
-                <input type="text" id="name" name="name" required>
+            <form id="publish-form" class="hidden" novalidate>
+                <div class="publish-main-content">
+                    <div class="publish-form-fields">
+                        <div class="form-group">
+                            <label for="name">Título del Anuncio</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="category">Categoría</label>
+                            <select id="category" name="category" required>
+                                <option value="" disabled selected>Selecciona una categoría</option>
+                                <option value="electronics">Electrónicos</option>
+                                <option value="vehicles">Vehículos</option>
+                                <option value="home">Hogar</option>
+                                <option value="sports">Deportes</option>
+                                <option value="fashion">Moda</option>
+                                <option value="real_estate">Bienes Raíces</option>
+                                <option value="services">Servicios</option>
+                                <option value="other">Otros</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="condition">Condición</label>
+                                <select id="condition" name="condition">
+                                    <option value="new">Nuevo</option>
+                                    <option value="used">Usado</option>
+                                </select>
+                                <input type="hidden" id="condition-hidden" name="condition_hidden">
+                            </div>
+                            <div class="form-group">
+                                <label for="price">Precio (₡)</label>
+                                <input type="text" id="price" name="price-display" inputmode="numeric" required>
+                                <input type="hidden" id="price-hidden" name="price">
+                            </div>
+                        </div>
 
-                <label for="description">Descripción</label>
-                <textarea id="description" name="description" rows="6" required minlength="20"></textarea>
-                <small id="description-counter" class="description-counter">0/20 caracteres</small>
+                        <div class="form-group">
+                            <label for="description">Descripción</label>
+                            <textarea id="description" name="description" rows="6" required minlength="20"></textarea>
+                            <small id="description-counter" class="description-counter">0/20 caracteres</small>
+                        </div>
 
-                <label for="price">Precio (₡)</label>
-                <div class="form-group">
-                    <input type="text" id="price" name="price-display" inputmode="numeric" required>
-                    <input type="hidden" id="price-hidden" name="price">
+                        <div class="form-group">
+                            <label for="images">Imágenes</label>
+                            <input type="file" id="images" name="images" multiple accept="image/*">
+                        </div>
+                    </div>
+                    <div class="publish-image-preview">
+                        <div id="image-preview-container"></div>
+                    </div>
                 </div>
-
-                <label for="category">Categoría</label>
-                <select id="category" name="category" required>
-                    <option value="">Selecciona una categoría</option>
-                    <option value="Ropa y accesorios">Ropa y accesorios</option>
-                    <option value="Electrónica">Electrónica</option>
-                    <option value="Hogar y muebles">Hogar y muebles</option>
-                    <option value="Vehículos">Vehículos</option>
-                    <option value="Servicios">Servicios</option>
-                    <option value="Otros">Otros</option>
-                </select>
-
-                <label for="condition">Estado del artículo</label>
-                <select id="condition" name="condition">
-                    <option value="">Selecciona el estado</option>
-                    <option value="new">Nuevo</option>
-                    <option value="like_new">Como nuevo</option>
-                    <option value="good">Buen estado</option>
-                    <option value="fair">Estado regular</option>
-                    <option value="regular">Para reparar</option>
-                </select>
-
-                <label for="photos">Fotos</label>
-                <input type="file" id="photos" name="photos" multiple accept="image/*">
-                <small>Sube una o más fotos de tu producto.</small>
-
-                <button type="submit" class="cta-button" id="submit-button">Confirmar Publicación</button>
+                <button type="submit" id="submit-button" class="button">Publicar</button>
             </form>
         </section>
     </main>

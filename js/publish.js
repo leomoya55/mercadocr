@@ -230,6 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const descriptionValue = descriptionInput.value || '';
+      if (descriptionValue.length < minDescriptionLength) {
+        Toast.error(`La descripción debe tener al menos ${minDescriptionLength} caracteres.`);
+        return;
+      }
+
       submitButton.disabled = true;
       submitButton.textContent = 'Publicando...';
 
