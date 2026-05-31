@@ -1,15 +1,23 @@
+// Sentry must load FIRST so its instrumentation installs before express/mongoose.
+// It is a safe no-op when SENTRY_DSN is unset, and also calls dotenv.config().
+const sentry = require('./config/sentry');
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-// const { cloudinary } = require('./config/cloudinary'); // No longer needed here
 
-// --- Centralized Cloudinary Configuration ---
-// Moved to on-demand configuration in routes
-// cloudinary.config({ ... });
-// -----------------------------------------
+const express   = require('express');
+const mongoose  = require('mongoose');
+const cors      = require('cors');
+const rateLimit = require('express-rate-limit');
+const path      = require('path');
+const fs        = require('fs');
+const dns       = require('dns').promises;
 
-const app = express();
-const PORT = process.env.PORT || 3001;
+// Optional security dependencies — skip gracefully if not yet installed
+let helmet, mongoSanitize;
+try { helmet        = require('helmet');                 } catch { /* not installed yet */ }
+try { mongoSanitize = require('express-mongo-sanitize'); } catch { /* not installed yet */ }
+
+const app  = express();
+const port = process.env.PORT || 3001;
 
 // In production, never auto-build indexes on connect — on serverless that would
 // fire on every cold start and add latency/timeout risk. Indexes are created

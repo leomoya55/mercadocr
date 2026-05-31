@@ -2,14 +2,13 @@ const express = require('express');
 const router  = require('express').Router();
 const Listing = require('../models/listing.model');
 const User    = require('../models/user.model');
-const upload  = require('../config/cloudinary');
+const { upload, cloudinary, configureCloudinary, getPublicIdFromUrl } = require('../config/cloudinary');
 const { verifyToken }          = require('../middleware/auth');
 const { ensureUser }           = require('../middleware/ensureUser');
 const { enforceListingLimit, getActiveCount, refundCreditIfUsed } = require('../middleware/listingLimits');
 const { isOwner }              = require('../config/plans');
 const { canFeatureListing }    = require('../config/featured');
 const { createListingLimiter } = require('../middleware/rateLimiters');
-const { getPublicIdFromUrl } = require('../config/cloudinary');
 
 // ─── Server-side listing validation (never trust the client) ─────────────────
 // Must match the <option value="…"> values in publish.html exactly.
