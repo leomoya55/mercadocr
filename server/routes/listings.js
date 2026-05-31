@@ -256,15 +256,13 @@ function uploadPhotos(req, res, next) {
     let message = 'No se pudieron subir las imágenes. Intenta de nuevo.';
     if (err.code === 'LIMIT_FILE_SIZE') {
       message = 'Cada imagen debe pesar menos de 10 MB.';
+    } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      message = 'Campo de imagen inesperado. Recarga la página e intenta de nuevo.';
     } else if (err.message && /tipo de archivo/i.test(err.message)) {
       message = err.message;
     }
-    // TEMP DIAGNOSTIC: include the raw Cloudinary/multer error so the owner can
-    // see the real cause while we pin this down. Remove once resolved.
-    const detail = err.message || String(err);
-    const httpCode = err.http_code || err.code || null;
-    console.error('[POST /add] upload error:', httpCode || '', detail, err);
-    return res.status(400).json({ error: message + ' [' + (httpCode || 'ERR') + ': ' + detail + ']', code: 'UPLOAD_ERROR' });
+    console.error('[POST /add] upload error:', err.code || err.http_code || '', err.message);
+    return res.status(400).json({ error: message, code: 'UPLOAD_ERROR' });
   });
 }
 
