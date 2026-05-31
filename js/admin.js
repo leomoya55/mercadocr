@@ -17,6 +17,18 @@
   var guard   = document.getElementById('admin-guard');
   var content = document.getElementById('admin-content');
 
+  // Attach a listener to a PERSISTENT element only once. The table wrappers
+  // survive re-renders (only their innerHTML changes), so calling
+  // addEventListener on every render stacked duplicate handlers — a single
+  // click then fired N delete requests; the extra ones hit an already-deleted
+  // item (404), producing a success toast AND an error toast at the same time.
+  function wireOnce(el, evt, fn) {
+    var k = '_wired_' + evt;
+    if (el[k]) return;
+    el[k] = true;
+    el.addEventListener(evt, fn);
+  }
+
   // ─── Auth gate ────────────────────────────────────────────────────────────
   auth.onAuthStateChanged(function (user) {
     if (!user) { window.location.href = '/login'; return; }
@@ -226,7 +238,7 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
 
-    wrap.addEventListener('click', function (e) {
+    wireOnce(wrap,'click', function (e) {
       var btn = e.target.closest('[data-action]');
       if (!btn) return;
       var action = btn.dataset.action;
@@ -338,7 +350,7 @@
     wrap.innerHTML = html;
 
     // Delegated: plan change (select → change event)
-    wrap.addEventListener('change', function (e) {
+    wireOnce(wrap,'change', function (e) {
       var sel = e.target.closest('.plan-select-inline');
       if (!sel) return;
       var newPlan  = sel.value;
@@ -358,7 +370,7 @@
     });
 
     // Delegated: button actions
-    wrap.addEventListener('click', function (e) {
+    wireOnce(wrap,'click', function (e) {
       var btn = e.target.closest('[data-action]');
       if (!btn) return;
       var action = btn.dataset.action;
@@ -456,7 +468,7 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
 
-    wrap.addEventListener('click', function (e) {
+    wireOnce(wrap,'click', function (e) {
       var btn = e.target.closest('[data-action]');
       if (!btn) return;
       adminPost('/api/admin/reports/' + btn.dataset.id + '/' + btn.dataset.action, {}, function () {
