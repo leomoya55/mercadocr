@@ -5,6 +5,8 @@ const listingSchema = new mongoose.Schema({
   description: { type: String, required: true },
   price:       { type: Number, required: true },
   category:    { type: String, required: true },
+  // Apparel size — only used for the 'Ropa y accesorios' category; '' otherwise.
+  size:        { type: String, default: '' },
   condition:   {
     type: String,
     enum: ['new', 'like_new', 'good', 'fair', 'regular', ''],

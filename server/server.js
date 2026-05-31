@@ -191,8 +191,18 @@ app.get('/product', async (req, res, next) => {
   }
 });
 
-// Serve static frontend from project root
-app.use(express.static(path.join(__dirname, '../'), { extensions: ['html'] }));
+// Serve static frontend from project root.
+// HTML is served with no-cache so browsers (esp. mobile Safari) always pick up
+// the latest markup — otherwise a stale cached page keeps loading old form/JS
+// references after a deploy. JS/CSS stay cacheable; they're busted via ?v=.
+app.use(express.static(path.join(__dirname, '../'), {
+  extensions: ['html'],
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  },
+}));
 
 // Serverless-safe MongoDB connection
 let lastDbError = null;

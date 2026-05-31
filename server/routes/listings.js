@@ -25,6 +25,10 @@ function validateListingInput(body) {
   const priceNum = Number(body.price);
   const category = String(body.category || '').trim();
   const condition = body.condition === undefined ? '' : String(body.condition).trim();
+  // Size only applies to the clothing category; ignored (stored as '') otherwise.
+  const size = category === 'Ropa y accesorios'
+    ? String(body.size || '').trim().slice(0, 30)
+    : '';
 
   if (name.length < 3 || name.length > 100) errors.push('El título debe tener entre 3 y 100 caracteres.');
   if (description.length < 10 || description.length > 2000) errors.push('La descripción debe tener entre 10 y 2000 caracteres.');
@@ -32,7 +36,7 @@ function validateListingInput(body) {
   if (!VALID_CATEGORIES.has(category)) errors.push('Categoría inválida.');
   if (!VALID_CONDITIONS.has(condition)) errors.push('Condición inválida.');
 
-  return { errors, clean: { name, description, price: priceNum, category, condition } };
+  return { errors, clean: { name, description, price: priceNum, category, condition, size } };
 }
 
 // ─── Public ──────────────────────────────────────────────────────────────────
@@ -296,7 +300,7 @@ router.post('/add',
       // featured is a manual/earned distinction — never auto-set on creation
       const newListing = new Listing({
         name: clean.name, description: clean.description, price: clean.price,
-        category: clean.category, condition: clean.condition,
+        category: clean.category, condition: clean.condition, size: clean.size,
         photos, contact, provincia,
         author: uid, featured: false,
       });
@@ -360,6 +364,10 @@ router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res)
     listing.price       = price;
     listing.category    = category;
     if (condition !== undefined) listing.condition = condition || '';
+    // Size only applies to the clothing category; cleared otherwise.
+    listing.size = category === 'Ropa y accesorios'
+      ? String(req.body.size || '').trim().slice(0, 30)
+      : '';
     if (req.files && req.files.length > 0) {
       listing.photos = req.files.map(f => f.path);
     }

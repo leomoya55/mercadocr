@@ -144,6 +144,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (imagesInput) imagesInput.addEventListener('change', renderImagePreviews);
 
+  // ─── Size field (only for the clothing category) ─────────────────────────────
+  const categorySelect = document.getElementById('category');
+  const sizeGroup      = document.getElementById('size-group');
+  const sizeSelect     = document.getElementById('size');
+  const SIZE_CATEGORY  = 'Ropa y accesorios';
+
+  function updateSizeVisibility() {
+    if (!sizeGroup) return;
+    const show = categorySelect && categorySelect.value === SIZE_CATEGORY;
+    sizeGroup.classList.toggle('hidden', !show);
+    // Clear the size when it doesn't apply, so we never store a stale value.
+    if (!show && sizeSelect) sizeSelect.value = '';
+  }
+
+  if (categorySelect) categorySelect.addEventListener('change', updateSizeVisibility);
+
 
   // ─── Plan UI helpers ──────────────────────────────────────────────────────
 
@@ -204,6 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
     priceHidden.value      = listing.price;
     form.category.value    = listing.category;
     if (form.condition) form.condition.value = listing.condition || '';
+    if (sizeSelect) sizeSelect.value = listing.size || '';
+    updateSizeVisibility();
     submitButton.textContent = 'Guardar cambios';
     showForm();
     // Manually trigger input events to update counters

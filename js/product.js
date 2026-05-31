@@ -100,6 +100,9 @@ document.addEventListener('DOMContentLoaded', function () {
             '</h1>' +
             '<div class="product-price">₡' + Number(product.price).toLocaleString('es-CR') + '</div>' +
             viewsHtml +
+            (product.size
+              ? '<div class="product-size"><h3>Talla</h3><p>' + escapeHtml(product.size) + '</p></div>'
+              : '') +
             '<div class="product-description">' +
               '<h3>Descripción</h3>' +
               '<p>' + escapeHtml(product.description) + '</p>' +
