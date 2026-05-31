@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
       : '';
 
     card.innerHTML =
-      '<img src="' + escapeHtml(listing.photos[0]) + '"' +
+      '<img src="' + escapeHtml(cldAuto(listing.photos[0])) + '"' +
       ' alt="' + escapeHtml(listing.name) + '"' +
       ' loading="lazy"' +
       ' width="400" height="200">' +

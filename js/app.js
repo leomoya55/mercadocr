@@ -10,16 +10,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetch(API_BASE_URL + '/api/listings')
       .then(response => response.json())
-      .then(listings => {
+      .then(data => {
         loading.remove();
-        const featured = listings.slice(0, 4);
+        // The feed returns { listings, pagination }; tolerate a bare array too.
+        const all = Array.isArray(data) ? data : (data.listings || []);
+        const featured = all.slice(0, 4);
         featured.forEach(listing => {
           const listingElement = document.createElement('a');
           listingElement.href = `/product?id=${listing._id}`;
           listingElement.classList.add('listing-item');
           const featuredBadge = listing.featured ? '<span class="badge-featured">Destacado</span>' : '';
+          const photo = listing.photos && listing.photos[0] ? escapeHtml(cldAuto(listing.photos[0])) : '';
           listingElement.innerHTML = `
-            <img src="${escapeHtml(listing.photos[0])}" alt="${escapeHtml(listing.name)}">
+            <img src="${photo}" alt="${escapeHtml(listing.name)}" loading="lazy">
             <div class="listing-item-content">
               <div class="listing-item-title">${escapeHtml(listing.name)}</div>
               <div class="listing-item-meta">

@@ -64,7 +64,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
 
-      var photos = Array.isArray(product.photos) && product.photos.length ? product.photos : [];
+      var photos = Array.isArray(product.photos) && product.photos.length
+        ? product.photos.map(cldAuto) : [];
       var seller = product.seller || null;
 
       // Build seller display name

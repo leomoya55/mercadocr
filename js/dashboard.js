@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const dimmed = isSold || isExpired;
-      const photo = listing.photos && listing.photos[0] ? escapeHtml(listing.photos[0]) : '';
+      const photo = listing.photos && listing.photos[0] ? escapeHtml(cldAuto(listing.photos[0])) : '';
       card.innerHTML = `
         <img src="${photo}" alt="${escapeHtml(listing.name)}"${dimmed ? ' style="opacity:0.55"' : ''}>
         <div class="listing-item-content">

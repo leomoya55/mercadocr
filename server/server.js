@@ -163,7 +163,11 @@ app.get('/product', async (req, res, next) => {
     const desc   = esc((listing.description || 'Ver anuncio en MercaTico').slice(0, 200));
     const price  = esc('₡' + Number(listing.price || 0).toLocaleString('es-CR'));
     // Only allow http(s) image URLs into the og:image attribute.
-    const rawPhoto = (listing.photos && listing.photos[0]) ? String(listing.photos[0]) : '';
+    let rawPhoto = (listing.photos && listing.photos[0]) ? String(listing.photos[0]) : '';
+    // Make HEIC/older images renderable + optimized for the social preview too.
+    if (rawPhoto.includes('res.cloudinary.com') && rawPhoto.includes('/upload/') && !/\/upload\/[^/]*f_auto/.test(rawPhoto)) {
+      rawPhoto = rawPhoto.replace('/upload/', '/upload/f_auto,q_auto/');
+    }
     const photo  = /^https?:\/\//i.test(rawPhoto) ? esc(rawPhoto) : '';
     const title  = `${name} — ${price} | MercaTico`;
 

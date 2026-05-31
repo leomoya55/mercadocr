@@ -45,11 +45,14 @@ const storage = new CloudinaryStorage({
   params: {
     folder:           'mercadocr/listings',
     allowed_formats:  ['jpg', 'png', 'jpeg', 'webp', 'gif', 'heic', 'heif'],
-    // Resize to ≤1200×900 (never upscale), convert to WebP, quality auto:good.
-    // fetch_format:auto lets Cloudinary serve AVIF/WebP to browsers that support them.
+    // Store every upload as WebP. CRITICAL for iPhone photos: they arrive as
+    // HEIC, which browsers cannot display — storing the asset as .heic produces
+    // a broken image everywhere. Forcing format:webp converts on upload so the
+    // stored URL is always browser-renderable. Resize to ≤1200×900 (no upscale).
+    format: 'webp',
     transformation: [
       { width: 1200, height: 900, crop: 'limit' },
-      { quality: 'auto:good', fetch_format: 'auto' },
+      { quality: 'auto:good' },
     ],
   },
 });
