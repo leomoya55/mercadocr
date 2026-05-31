@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const note = document.createElement('p');
             note.id = 'phone-lock-note';
             note.style.cssText = 'font-size:0.82rem;color:#888;margin-top:-0.5rem;';
-            note.innerHTML = 'Para cambiar tu número escríbenos a <a href="mailto:soporte@mercadocr.com" style="color:#e8c97a;">soporte@mercadocr.com</a>.';
+            note.innerHTML = 'Para cambiar tu número escríbenos a <a href="mailto:soporte@mercaticocr.com" style="color:#e8c97a;">soporte@mercaticocr.com</a>.';
             phoneInput.after(note);
         }
     }

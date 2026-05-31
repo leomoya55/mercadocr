@@ -155,8 +155,8 @@ router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res
           price_data: {
             currency: 'crc',
             product_data: {
-              name: 'Publicación adicional - MercadoCR',
-              description: '1 publicación adicional en MercadoCR.',
+              name: 'Publicación adicional - MercaTico',
+              description: '1 publicación adicional en MercaTico.',
             },
             unit_amount: 50000, // ₡500 (CRC has 2 decimal places in Stripe)
           },
@@ -221,7 +221,7 @@ router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res
         price_data: {
           currency: 'crc',
           product_data: {
-            name: isPro ? 'Suscripción Pro MercadoCR' : 'Suscripción Basic MercadoCR',
+            name: isPro ? 'Suscripción Pro MercaTico' : 'Suscripción Basic MercaTico',
             description: isPro
               ? 'Plan Pro mensual con publicaciones ilimitadas.'
               : 'Plan Basic mensual con hasta 25 anuncios activos.',

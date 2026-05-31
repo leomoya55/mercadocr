@@ -1,5 +1,5 @@
 /**
- * ui.js — reusable UI components for MercadoCR
+ * ui.js — reusable UI components for MercaTico
  *
  * Exposes on window:
  *   Toast.success / .error / .info  — slide-in notifications with deduplication

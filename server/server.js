@@ -158,12 +158,12 @@ app.get('/product', async (req, res, next) => {
       .replace(/'/g, '&#39;');
 
     const name   = esc(listing.name || 'Anuncio');
-    const desc   = esc((listing.description || 'Ver anuncio en MercadoCR').slice(0, 200));
+    const desc   = esc((listing.description || 'Ver anuncio en MercaTico').slice(0, 200));
     const price  = esc('₡' + Number(listing.price || 0).toLocaleString('es-CR'));
     // Only allow http(s) image URLs into the og:image attribute.
     const rawPhoto = (listing.photos && listing.photos[0]) ? String(listing.photos[0]) : '';
     const photo  = /^https?:\/\//i.test(rawPhoto) ? esc(rawPhoto) : '';
-    const title  = `${name} — ${price} | MercadoCR`;
+    const title  = `${name} — ${price} | MercaTico`;
 
     html = html
       .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
@@ -174,7 +174,7 @@ app.get('/product', async (req, res, next) => {
         `  <meta property="og:description" content="${desc}">\n` +
         `  <meta property="og:type" content="product">\n` +
         (photo ? `  <meta property="og:image" content="${photo}">\n` : '') +
-        `  <meta property="og:site_name" content="MercadoCR">\n` +
+        `  <meta property="og:site_name" content="MercaTico">\n` +
         `  <meta name="twitter:card" content="summary_large_image">\n` +
         `  <meta name="twitter:title" content="${name}">\n` +
         `  <meta name="twitter:description" content="${desc}">\n` +

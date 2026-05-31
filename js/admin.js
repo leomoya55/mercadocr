@@ -1,5 +1,5 @@
 /**
- * admin.js — MercadoCR admin panel
+ * admin.js — MercaTico admin panel
  *
  * Security model:
  *   - Frontend: only renders the panel when Firebase Auth user email === OWNER_EMAIL.
