@@ -1,3 +1,4 @@
+const express = require('express');
 const router  = require('express').Router();
 const Listing = require('../models/listing.model');
 const User    = require('../models/user.model');
@@ -8,6 +9,7 @@ const { enforceListingLimit, getActiveCount, refundCreditIfUsed } = require('../
 const { isOwner }              = require('../config/plans');
 const { canFeatureListing }    = require('../config/featured');
 const { createListingLimiter } = require('../middleware/rateLimiters');
+const { getPublicIdFromUrl } = require('../config/cloudinary');
 
 // ─── Server-side listing validation (never trust the client) ─────────────────
 // Must match the <option value="…"> values in publish.html exactly.
@@ -370,20 +372,39 @@ router.post('/mark-sold/:id', verifyToken, async (req, res) => {
 /**
  * POST /delete/:id
  * Hard-deletes the document. Because getActiveCount only counts existing
- * documents, deletion immediately frees a slot — no extra bookkeeping needed.
+ * documents, this is safe and doesn't require a 'deleted' status.
  */
 router.post('/delete/:id', verifyToken, async (req, res) => {
   try {
-    const uid     = req.uid;
-    const listing = await Listing.findById(req.params.id);
-    if (!listing)             return res.status(404).json('Listing not found');
-    if (listing.author !== uid) return res.status(403).json('Not authorized');
+    const listing = await Listing.findOne({ _id: req.params.id, author: req.uid });
+    if (!listing) {
+      return res.status(404).json('Listing not found or you do not have permission to delete it.');
+    }
 
-    await listing.deleteOne();
-    res.json('Listing deleted');
+    // --- Cloudinary Deletion ---
+    if (listing.photos && listing.photos.length > 0) {
+      const publicIds = listing.photos.map(getPublicIdFromUrl).filter(id => id);
+      if (publicIds.length > 0) {
+        await cloudinary.api.delete_resources(publicIds);
+        console.log(`[Cloudinary] Deleted ${publicIds.length} image(s) for listing ${listing._id}`);
+      }
+    }
+    // -------------------------
+
+    const deleteResult = await listing.deleteOne();
+
+    // --- Verification Step ---
+    if (deleteResult.deletedCount === 1) {
+      console.log(`[MongoDB] Successfully deleted listing ${listing._id}`);
+      res.json({ message: 'Listing deleted successfully', deleted: true });
+    } else {
+      console.warn(`[MongoDB] Failed to delete listing ${listing._id}. deleteOne returned deletedCount: 0`);
+      res.status(500).json({ message: 'Failed to delete listing from database.', deleted: false });
+    }
+
   } catch (err) {
     console.error('[POST /delete]', err);
-    res.status(500).json('Error: ' + err.message);
+    res.status(500).json('Server error while deleting listing.');
   }
 });
 
