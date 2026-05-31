@@ -241,12 +241,35 @@ router.get('/:id', async (req, res) => {
  *
  * Handler has zero plan / limit logic — all of that lives in middleware.
  */
+
+/**
+ * Wraps multer's upload.array so its errors become clean JSON instead of an
+ * unhandled 500 (which the frontend can only show as a generic "Error al
+ * publicar"). A rejected upload happens AFTER enforceListingLimit, so we refund
+ * any credit it consumed before responding.
+ */
+function uploadPhotos(req, res, next) {
+  configureCloudinary(); // idempotent — guarantees credentials are set before upload
+  upload.array('photos')(req, res, async (err) => {
+    if (!err) return next();
+    await refundCreditIfUsed(req);
+    let message = 'No se pudieron subir las imágenes. Intenta de nuevo.';
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      message = 'Cada imagen debe pesar menos de 10 MB.';
+    } else if (err.message && /tipo de archivo/i.test(err.message)) {
+      message = err.message;
+    }
+    console.error('[POST /add] upload error:', err.code || '', err.message);
+    return res.status(400).json({ error: message, code: 'UPLOAD_ERROR' });
+  });
+}
+
 router.post('/add',
   verifyToken,
   createListingLimiter,   // anti-spam: keyed by uid, runs after verifyToken sets req.uid
   ensureUser,
   enforceListingLimit,
-  upload.array('photos'),
+  uploadPhotos,
   async (req, res) => {
     try {
       const uid  = req.uid;

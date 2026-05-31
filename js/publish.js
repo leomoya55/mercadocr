@@ -308,9 +308,15 @@ document.addEventListener('DOMContentLoaded', () => {
           showPayments();
 
         } else {
-          const errorText = await response.text().catch(() => String(response.status));
-          Toast.error('Error al publicar. Por favor intenta de nuevo.');
-          console.error('[publish] server error:', errorText);
+          // Surface the server's specific reason (e.g. unsupported image, file
+          // too large, validation) instead of a generic message, so the user
+          // knows what to fix — especially important on mobile.
+          const errData = await response.json().catch(() => null);
+          const msg = (errData && errData.error)
+            ? errData.error
+            : 'Error al publicar. Por favor intenta de nuevo.';
+          Toast.error(msg);
+          console.error('[publish] server error:', response.status, errData);
         }
       } catch (error) {
         console.error('[publish] network error:', error);

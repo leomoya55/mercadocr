@@ -32,13 +32,19 @@ function getPublicIdFromUrl(url) {
 }
 
 // Validate actual MIME type, not just the file extension, to block disguised files.
-const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+// heic/heif are the default iPhone camera formats — without them, every photo
+// taken on an iOS device is rejected at upload. Cloudinary ingests HEIC fine and
+// the transformation below converts it to WebP/AVIF for delivery.
+const ALLOWED_MIMES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'image/heic', 'image/heif',
+]);
 
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder:           'mercadocr/listings',
-    allowed_formats:  ['jpg', 'png', 'jpeg', 'webp', 'gif'],
+    allowed_formats:  ['jpg', 'png', 'jpeg', 'webp', 'gif', 'heic', 'heif'],
     // Resize to ≤1200×900 (never upscale), convert to WebP, quality auto:good.
     // fetch_format:auto lets Cloudinary serve AVIF/WebP to browsers that support them.
     transformation: [
