@@ -25,14 +25,20 @@ const { getEffectiveMembership } = require('../config/membership');
 // ─── Core count helper ────────────────────────────────────────────────────────
 
 /**
- * Count a user's active (non-sold) listings.
+ * Count a user's active listings — excludes sold AND expired listings, since
+ * neither occupies a public slot. An expired listing only counts again once the
+ * user renews it.
  * Relies on the compound index { author: 1, status: 1 } in listing.model.js.
  *
  * @param {string} uid — Firebase UID
  * @returns {Promise<number>}
  */
 async function getActiveCount(uid) {
-  return Listing.countDocuments({ author: uid, status: { $ne: 'sold' } });
+  return Listing.countDocuments({
+    author: uid,
+    status: { $ne: 'sold' },
+    expiresAt: { $gt: new Date() },
+  });
 }
 
 // ─── enforceListingLimit ──────────────────────────────────────────────────────

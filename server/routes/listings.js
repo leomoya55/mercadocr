@@ -68,8 +68,8 @@ router.get('/', async (req, res) => {
     const limit = Math.min(50, parseInt(req.query.limit) || 20);
     const skip  = (page - 1) * limit;
 
-    // Base filter — only non-hidden active listings
-    const filter = { status: 'active', hidden: { $ne: true } };
+    // Base filter — only non-hidden, non-expired active listings
+    const filter = { status: 'active', hidden: { $ne: true }, expiresAt: { $gt: new Date() } };
 
     if (q && q.trim()) {
       filter.$text = { $search: q.trim() };
@@ -222,6 +222,10 @@ router.get('/:id', async (req, res) => {
     if (!listing) return res.status(404).json('Listing not found');
     // Hidden listings are only visible in the admin panel
     if (listing.hidden) return res.status(404).json('Listing not found');
+    // Expired listings are off the marketplace until the owner renews them
+    if (listing.expiresAt && new Date(listing.expiresAt) <= new Date()) {
+      return res.status(404).json('Listing not found');
+    }
 
     const seller = await User.findOne({ firebaseUid: listing.author })
       .select('nombre apellido phone provincia -_id').lean();
@@ -403,6 +407,45 @@ router.post('/mark-sold/:id', verifyToken, async (req, res) => {
     res.status(500).json('Error: ' + err.message);
   }
 });
+
+/**
+ * POST /renew/:id
+ * Owner-only. Extends an (expired or soon-to-expire) listing for another 30 days
+ * and returns it to the active feed. Goes through enforceListingLimit so renewing
+ * respects the user's plan limit exactly like publishing a new listing.
+ */
+router.post('/renew/:id',
+  verifyToken,
+  ensureUser,
+  async (req, res, next) => {
+    try {
+      const listing = await Listing.findById(req.params.id);
+      if (!listing)               return res.status(404).json({ error: 'Listing not found' });
+      if (listing.author !== req.uid) return res.status(403).json({ error: 'Not authorized' });
+      req._renewListing = listing;
+      next();
+    } catch (err) {
+      console.error('[POST /renew] lookup', err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+  enforceListingLimit,
+  async (req, res) => {
+    try {
+      const listing = req._renewListing;
+      const ttl = Listing.LISTING_ACTIVE_MS || 30 * 24 * 60 * 60 * 1000;
+      listing.status    = 'active';
+      listing.soldAt    = null;
+      listing.expiresAt = new Date(Date.now() + ttl);
+      await listing.save();
+      res.json({ message: 'Listing renewed', expiresAt: listing.expiresAt });
+    } catch (err) {
+      await refundCreditIfUsed(req);
+      console.error('[POST /renew]', err);
+      res.status(500).json({ error: err.message, code: 'RENEW_FAILED' });
+    }
+  }
+);
 
 /**
  * POST /delete/:id

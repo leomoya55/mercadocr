@@ -22,35 +22,53 @@ document.addEventListener('DOMContentLoaded', () => {
     listings.forEach(listing => {
       const card   = document.createElement('div');
       card.className = 'listing-item';
+      const now           = Date.now();
       const isSold        = listing.status === 'sold';
-      const featuredBadge = listing.featured && !isSold ? '<span class="badge-featured">Destacado</span>' : '';
+      const isExpired     = !isSold && listing.expiresAt &&
+                            new Date(listing.expiresAt).getTime() <= now;
+      const isLive        = !isSold && !isExpired;
+
+      const featuredBadge = listing.featured && isLive ? '<span class="badge-featured">Destacado</span>' : '';
       const soldBadge     = isSold ? '<span class="badge-sold">Vendido</span>' : '';
-      const editBtn       = !isSold ? `<button data-edit="${listing._id}">Editar</button>` : '';
-      const markSoldBtn   = !isSold
+      const expiredBadge  = isExpired ? '<span class="badge-expired">Expirado</span>' : '';
+
+      // Live listings can be edited / marked sold; expired ones can be renewed.
+      const editBtn     = isLive ? `<button data-edit="${listing._id}">Editar</button>` : '';
+      const markSoldBtn = isLive
         ? `<button data-mark-sold="${listing._id}" class="btn-mark-sold">Marcar vendido</button>`
+        : '';
+      const renewBtn = isExpired
+        ? `<button data-renew="${listing._id}" class="btn-renew">Renovar</button>`
         : '';
 
       // Sold listings auto-delete a week after being marked sold.
-      let soldNote = '';
+      let statusNote = '';
       if (isSold) {
-        const removalMs = (listing.soldAt ? new Date(listing.soldAt).getTime() : Date.now())
+        const removalMs = (listing.soldAt ? new Date(listing.soldAt).getTime() : now)
           + 7 * 24 * 60 * 60 * 1000;
-        const daysLeft = Math.max(0, Math.ceil((removalMs - Date.now()) / (24 * 60 * 60 * 1000)));
-        soldNote = `<div class="sold-note">Se elimina en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}</div>`;
+        const daysLeft = Math.max(0, Math.ceil((removalMs - now) / (24 * 60 * 60 * 1000)));
+        statusNote = `<div class="sold-note">Se elimina en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}</div>`;
+      } else if (isExpired) {
+        statusNote = '<div class="expired-note">Expirado · renueva para reactivarlo 30 días más.</div>';
+      } else if (listing.expiresAt) {
+        const daysLeft = Math.max(0, Math.ceil((new Date(listing.expiresAt).getTime() - now) / (24 * 60 * 60 * 1000)));
+        statusNote = `<div class="expiry-note">Vence en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}</div>`;
       }
 
+      const dimmed = isSold || isExpired;
       const photo = listing.photos && listing.photos[0] ? escapeHtml(listing.photos[0]) : '';
       card.innerHTML = `
-        <img src="${photo}" alt="${escapeHtml(listing.name)}"${isSold ? ' style="opacity:0.55"' : ''}>
+        <img src="${photo}" alt="${escapeHtml(listing.name)}"${dimmed ? ' style="opacity:0.55"' : ''}>
         <div class="listing-item-content">
           <div class="listing-item-title">${escapeHtml(listing.name)}</div>
           <div class="listing-item-meta">
             <div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>
-            ${featuredBadge}${soldBadge}
+            ${featuredBadge}${soldBadge}${expiredBadge}
           </div>
-          ${soldNote}
+          ${statusNote}
           ${listing.provincia ? `<div class="listing-item-location">📍 ${escapeHtml(listing.provincia)}</div>` : ''}
           <div class="dashboard-actions">
+            ${renewBtn}
             ${editBtn}
             ${markSoldBtn}
             <button data-delete="${listing._id}">Eliminar</button>
@@ -84,6 +102,39 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {
           btn.disabled = false;
           btn.textContent = 'Marcar vendido';
+        }
+      });
+    });
+
+    container.querySelectorAll('[data-renew]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const ok = await Modal.confirm({
+          title: 'Renovar anuncio',
+          message: 'Tu anuncio volverá a estar activo en el mercado durante 30 días más.',
+          confirmText: 'Renovar',
+          cancelText: 'Cancelar',
+        });
+        if (!ok) return;
+        btn.disabled = true;
+        btn.textContent = 'Renovando...';
+        try {
+          const r = await fetchWithTimeout(`/api/listings/renew/${btn.getAttribute('data-renew')}`, { method: 'POST' });
+          if (r.ok) {
+            UserStore.invalidate();
+            Toast.success('Anuncio renovado por 30 días.');
+            window.location.reload();
+          } else if (r.status === 402) {
+            Toast.error('Alcanzaste el límite de tu plan. Libera un espacio o mejora tu plan para renovar.');
+            btn.disabled = false;
+            btn.textContent = 'Renovar';
+          } else {
+            Toast.error('No se pudo renovar. Intenta de nuevo.');
+            btn.disabled = false;
+            btn.textContent = 'Renovar';
+          }
+        } catch {
+          btn.disabled = false;
+          btn.textContent = 'Renovar';
         }
       });
     });

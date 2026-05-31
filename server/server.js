@@ -21,7 +21,7 @@ const port = process.env.PORT || 3001;
 
 // In production, never auto-build indexes on connect — on serverless that would
 // fire on every cold start and add latency/timeout risk. Indexes are created
-// once via a guarded migration (ensure_indexes_v3) in runStartupMigrations().
+// once via a guarded migration (ensure_indexes_v4) in runStartupMigrations().
 mongoose.set('autoIndex', process.env.NODE_ENV !== 'production');
 
 // ─── Security headers ─────────────────────────────────────────────────────────
@@ -139,6 +139,8 @@ app.get('/product', async (req, res, next) => {
     const Listing = require('./models/listing.model');
     const listing  = await Listing.findById(id).lean();
     if (!listing || listing.hidden) return next();
+    // Expired listings are off the marketplace until renewed
+    if (listing.expiresAt && new Date(listing.expiresAt) <= new Date()) return next();
 
     const htmlPath = path.join(__dirname, '../product.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
@@ -315,7 +317,7 @@ async function runStartupMigrations() {
     //     duplicate-email blocking the unique index) is logged but never blocks
     //     the others or the server. Bump the version suffix to force a rebuild
     //     after adding new indexes.
-    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v3' });
+    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v4' });
     if (!indexesRan) {
       const models = {
         User:           require('./models/user.model'),
@@ -337,7 +339,7 @@ async function runStartupMigrations() {
       // Only mark complete if every model succeeded, so a transient failure
       // (e.g. a duplicate that still needs cleanup) retries on the next cold start.
       if (allOk) {
-        await migrationsCol.insertOne({ name: 'ensure_indexes_v3', ranAt: new Date() });
+        await migrationsCol.insertOne({ name: 'ensure_indexes_v4', ranAt: new Date() });
       }
     }
 
@@ -354,6 +356,21 @@ async function runStartupMigrations() {
       } else {
         console.log('[migration] clear_auto_featured_v1: no listings to clear');
       }
+    }
+
+    // 6. Backfill expiresAt on listings created before the expiry feature.
+    //    Give every existing listing a fresh 30-day window from now so nothing
+    //    disappears the moment the feature ships; new clocks start on renewal.
+    const expiryBackfillRan = await migrationsCol.findOne({ name: 'backfill_listing_expiry_v1' });
+    if (!expiryBackfillRan) {
+      const listingsCol = mongoose.connection.collection('listings');
+      const thirtyDaysOut = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const backfilled = await listingsCol.updateMany(
+        { expiresAt: { $exists: false } },
+        { $set: { expiresAt: thirtyDaysOut } }
+      );
+      await migrationsCol.insertOne({ name: 'backfill_listing_expiry_v1', ranAt: new Date() });
+      console.log(`[migration] backfill_listing_expiry_v1: set expiresAt on ${backfilled.modifiedCount} listing(s)`);
     }
   } catch (err) {
     // Never let a migration error prevent the server from starting

@@ -73,3 +73,29 @@
     color: #e08080;
     margin-top: 0.3rem;
 }
+
+.expired-note {
+    font-size: 0.78rem;
+    color: #d0a060;
+    margin-top: 0.3rem;
+}
+
+.expiry-note {
+    font-size: 0.78rem;
+    color: #888;
+    margin-top: 0.3rem;
+}
+
+.btn-renew {
+    background: #e8c97a;
+    color: #0d0d0d;
+    border: none;
+    cursor: pointer;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+}
+.btn-renew:hover { background: #f5dfa0; }
+.btn-renew:disabled { background: #555; color: #aaa; cursor: not-allowed; }
