@@ -259,8 +259,12 @@ function uploadPhotos(req, res, next) {
     } else if (err.message && /tipo de archivo/i.test(err.message)) {
       message = err.message;
     }
-    console.error('[POST /add] upload error:', err.code || '', err.message);
-    return res.status(400).json({ error: message, code: 'UPLOAD_ERROR' });
+    // TEMP DIAGNOSTIC: include the raw Cloudinary/multer error so the owner can
+    // see the real cause while we pin this down. Remove once resolved.
+    const detail = err.message || String(err);
+    const httpCode = err.http_code || err.code || null;
+    console.error('[POST /add] upload error:', httpCode || '', detail, err);
+    return res.status(400).json({ error: message + ' [' + (httpCode || 'ERR') + ': ' + detail + ']', code: 'UPLOAD_ERROR' });
   });
 }
 
