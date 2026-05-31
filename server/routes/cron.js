@@ -125,25 +125,14 @@ router.get('/downgrade-expired', async (req, res) => {
 });
 
 /**
- * GET /api/cron/cleanup-sold
- *
- * Deletes listings that have been marked sold for more than a week, removing
- * both the MongoDB document and the Cloudinary images. This keeps sold listings
- * visible in the seller's panel for ~7 days, then reclaims all the data so the
- * database and image storage never accumulate sold items indefinitely.
+ * Hard-delete a batch of listings, removing their Cloudinary images first so no
+ * orphaned images are left behind. Returns counts for logging.
  */
-router.get('/cleanup-sold', async (req, res) => {
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-  const candidates = await Listing.find({
-    status: 'sold',
-    soldAt: { $ne: null, $lt: cutoff },
-  }).select('_id photos').limit(500).lean();
-
+async function deleteListingBatch(listings, where) {
   let deleted = 0, imagesDeleted = 0, errors = 0;
-  if (candidates.length) configureCloudinary();
+  if (listings.length) configureCloudinary();
 
-  for (const l of candidates) {
+  for (const l of listings) {
     try {
       if (Array.isArray(l.photos) && l.photos.length) {
         const publicIds = l.photos.map(getPublicIdFromUrl).filter(Boolean);
@@ -155,14 +144,46 @@ router.get('/cleanup-sold', async (req, res) => {
       await Listing.deleteOne({ _id: l._id });
       deleted++;
     } catch (err) {
-      console.error('[cron] cleanup-sold failed for', l._id, err.message);
-      captureException(err, { where: 'cron_cleanup_sold', listingId: String(l._id) });
+      console.error(`[cron] ${where} failed for`, l._id, err.message);
+      captureException(err, { where, listingId: String(l._id) });
       errors++;
     }
   }
+  return { deleted, imagesDeleted, errors };
+}
 
-  console.log(JSON.stringify({ job: 'cleanup-sold', candidates: candidates.length, deleted, imagesDeleted, errors }));
-  res.json({ ok: true, candidates: candidates.length, deleted, imagesDeleted, errors });
+/**
+ * GET /api/cron/cleanup
+ *
+ * Reclaims data from listings that are no longer live, removing both the
+ * MongoDB document and the Cloudinary images so nothing accumulates:
+ *   1. Sold listings   — deleted ~7 days after being marked sold.
+ *   2. Abandoned posts — expired and never renewed; deleted ~7 days after they
+ *                        expired (so the seller had a full week to renew).
+ */
+router.get('/cleanup', async (req, res) => {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const sold = await Listing.find({
+    status: 'sold',
+    soldAt: { $ne: null, $lt: weekAgo },
+  }).select('_id photos').limit(500).lean();
+
+  const abandoned = await Listing.find({
+    status: { $ne: 'sold' },
+    expiresAt: { $ne: null, $lt: weekAgo }, // expired more than a week ago
+  }).select('_id photos').limit(500).lean();
+
+  const soldRes      = await deleteListingBatch(sold,      'cron_cleanup_sold');
+  const abandonedRes = await deleteListingBatch(abandoned, 'cron_cleanup_expired');
+
+  const summary = {
+    job: 'cleanup',
+    sold:      { candidates: sold.length,      ...soldRes },
+    abandoned: { candidates: abandoned.length, ...abandonedRes },
+  };
+  console.log(JSON.stringify(summary));
+  res.json({ ok: true, ...summary });
 });
 
 module.exports = router;

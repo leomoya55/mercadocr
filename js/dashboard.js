@@ -49,7 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const daysLeft = Math.max(0, Math.ceil((removalMs - now) / (24 * 60 * 60 * 1000)));
         statusNote = `<div class="sold-note">Se elimina en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}</div>`;
       } else if (isExpired) {
-        statusNote = '<div class="expired-note">Expirado · renueva para reactivarlo 30 días más.</div>';
+        const deleteMs = new Date(listing.expiresAt).getTime() + 7 * 24 * 60 * 60 * 1000;
+        const daysToDelete = Math.max(0, Math.ceil((deleteMs - now) / (24 * 60 * 60 * 1000)));
+        statusNote = `<div class="expired-note">Expirado · se elimina en ${daysToDelete} día${daysToDelete !== 1 ? 's' : ''} si no renuevas.</div>`;
       } else if (listing.expiresAt) {
         const daysLeft = Math.max(0, Math.ceil((new Date(listing.expiresAt).getTime() - now) / (24 * 60 * 60 * 1000)));
         statusNote = `<div class="expiry-note">Vence en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}</div>`;

@@ -14,6 +14,6 @@
   ],
   "crons": [
     { "path": "/api/cron/downgrade-expired", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/cleanup-sold", "schedule": "30 3 * * *" }
+    { "path": "/api/cron/cleanup", "schedule": "30 3 * * *" }
   ]
 }
