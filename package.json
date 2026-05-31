@@ -2,5 +2,8 @@
   "name": "mercatico",
   "description": "MercaTico - Compra y vende en Costa Rica",
   "version": "1.0.0",
-  "main": "server/server.js"
+  "main": "server/server.js",
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
 }
