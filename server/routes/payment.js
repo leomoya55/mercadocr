@@ -194,6 +194,21 @@ router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res
       }
     }
 
+    // ── GUARD: never create a SECOND subscription for an existing subscriber ──
+    // We only reach here with an active sub if the in-place proration swap above
+    // could NOT run (Price IDs not configured, or the subscription item was
+    // missing). Falling through to Checkout below would create a second active
+    // subscription → the user is double-billed, and the cancel UI (which uses the
+    // single stored stripeSubscriptionId) can never stop the orphaned one. Fail
+    // loudly instead. New subscribers (no active sub) skip this and proceed.
+    if (eff.active && user.stripeSubscriptionId) {
+      console.error('[create-checkout-session] tier change blocked to avoid double-billing — hasPriceIds:', hasPriceIds(), 'sub:', user.stripeSubscriptionId);
+      return res.status(409).json({
+        error: 'subscription_change_unavailable',
+        message: 'No pudimos cambiar tu plan automáticamente. Escríbenos y lo ajustamos manualmente.',
+      });
+    }
+
     // ── New subscription via Checkout ──────────────────────────────────────
     // Prefer a persistent Price ID (enables future proration); fall back to
     // inline price_data so checkout still works before Prices are created.
