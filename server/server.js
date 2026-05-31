@@ -1,6 +1,4 @@
-// MUST be first: installs Sentry instrumentation before other libs load.
-// No-op unless SENTRY_DSN is set (see config/sentry.js).
-const sentry   = require('./config/sentry');
+require('dotenv').config();
 
 const express  = require('express');
 const mongoose = require('mongoose');
@@ -9,7 +7,6 @@ const rateLimit = require('express-rate-limit');
 const path     = require('path');
 const fs       = require('fs');
 const dns      = require('dns').promises;
-require('dotenv').config();
 
 // Optional security dependencies — skip gracefully if not yet installed
 let helmet, mongoSanitize;
