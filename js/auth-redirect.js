@@ -1,30 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // ─── Mobile menu toggle ───────────────────────────────────────────────────
-    // Inject a hamburger/account button into the nav (kept out of the HTML so it
-    // stays consistent across every page). On mobile it sits top-right; tapping
-    // it opens the nav links panel. Its label shows the user's name when logged in.
-    const navEl = document.querySelector('header nav');
-    const navUl = navEl ? navEl.querySelector('ul') : null;
-    if (navEl && navUl && !document.getElementById('nav-toggle')) {
-        const toggle = document.createElement('button');
-        toggle.id = 'nav-toggle';
-        toggle.className = 'nav-toggle';
-        toggle.type = 'button';
-        toggle.setAttribute('aria-label', 'Abrir menú');
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.innerHTML = '<span class="nav-toggle-label">Menú</span>' +
-                           '<span class="nav-toggle-icon" aria-hidden="true">☰</span>';
-        navEl.insertBefore(toggle, navUl);
-        toggle.addEventListener('click', () => {
-            const open = navUl.classList.toggle('nav-open');
-            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        });
-        // Close the panel after tapping a link.
-        navUl.addEventListener('click', (e) => {
-            if (e.target.closest('a')) navUl.classList.remove('nav-open');
-        });
-    }
-
     // Publish CTA: redirect to login if not authenticated
     document.querySelectorAll('[data-publish-cta]').forEach(link => {
         link.addEventListener('click', event => {
@@ -88,14 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
             el.classList.toggle('nav-hidden', !isOwner);
         });
 
-        const toggleLabel = document.querySelector('#nav-toggle .nav-toggle-label');
         if (user) {
             const name = user.displayName || user.email.split('@')[0];
             const btn = document.getElementById('nav-user-btn');
             if (btn) btn.textContent = name;
-            if (toggleLabel) toggleLabel.textContent = name; // show name top-right on mobile
-        } else if (toggleLabel) {
-            toggleLabel.textContent = 'Menú';
         }
     });
 });
