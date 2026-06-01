@@ -175,6 +175,11 @@
   line-height: 1.65;
 }
 
+/* Preserve the paragraphs/line breaks the seller typed in the description. */
+.product-description p {
+  white-space: pre-line;
+}
+
 .product-seller p {
   margin: 0.2rem 0;
   color: #ccc;

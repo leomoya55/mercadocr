@@ -113,9 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
               : '') +
             '<div class="product-seller">' +
               '<h3>Vendedor</h3>' +
-              '<p>' + sellerName +
-                (seller && seller.provincia ? ' · 📍 ' + escapeHtml(seller.provincia) : '') +
-              '</p>' +
+              '<p>' + sellerName + '</p>' +
             '</div>' +
             waHtml +
             '<button type="button" class="report-btn" id="report-btn" data-listing-id="' + escapeHtml(product._id) + '">' +
@@ -173,7 +171,12 @@ function _initReportButton(listingId) {
       '<button type="button" id="report-submit" class="cta-button" style="margin-top:1rem;width:100%;">Enviar reporte</button>';
 
     if (typeof Modal !== 'undefined') {
-      Modal.show({ title: 'Reportar anuncio', body: body });
+      // Modal.show renders opts.html (not opts.body) — pass html so the report
+      // form actually appears instead of an empty modal.
+      Modal.show({
+        ariaLabel: 'Reportar anuncio',
+        html: '<h2 class="modal-confirm-title">Reportar anuncio</h2>' + body,
+      });
     }
 
     // Wire up the submit button inside the modal (after it's in the DOM)

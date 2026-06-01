@@ -19,6 +19,7 @@ header {
     background-color: #121212;
     padding: 1rem 2rem;
     border-bottom: 1px solid #222;
+    position: -webkit-sticky; /* iOS Safari needs the prefixed value */
     position: sticky;
     top: 0;
     z-index: 1000;

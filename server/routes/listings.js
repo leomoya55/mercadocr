@@ -18,6 +18,46 @@ const VALID_CATEGORIES = new Set([
 ]);
 const VALID_CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'regular', '']);
 
+// ─── Prohibited-content filter ───────────────────────────────────────────────
+// Blocks listings for illegal / restricted goods (drugs, alcohol, tobacco,
+// weapons, sexual services). Terms are stored WITHOUT accents; the matcher
+// strips accents from the listing text before testing, and matches whole words
+// only (so "coca" doesn't trip on "cocada", etc.). Edit this list freely.
+const BANNED_TERMS = [
+  // Drogas
+  'droga', 'drogas', 'marihuana', 'mariguana', 'marijuana', 'weed', 'cannabis',
+  'mota', 'cogollo', 'porro', 'cocaina', 'crack', 'heroina', 'metanfetamina',
+  'cristal', 'mdma', 'extasis', 'lsd', 'hachis', 'hash', 'ketamina', 'fentanilo',
+  'cripy', 'cripa', 'sicodelicos', 'psicodelicos', 'hongos magicos',
+  // Alcohol y tabaco
+  'cerveza', 'cervezas', 'licor', 'licores', 'guaro', 'vodka', 'whisky', 'whiskey',
+  'ron', 'tequila', 'aguardiente', 'cigarrillo', 'cigarrillos', 'cigarro', 'cigarros',
+  'tabaco', 'vape', 'vaper', 'vapeador',
+  // Servicios sexuales
+  'prostitucion', 'prostituta', 'prostituto', 'escort', 'escorts', 'sexoservicio',
+  'servicios sexuales', 'servicio sexual', 'dama de compania', 'acompanante sexual',
+  // Armas
+  'arma de fuego', 'armas de fuego', 'pistola', 'rifle', 'municion', 'municiones',
+  'granada', 'silenciador',
+];
+
+function stripAccents(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+/** Returns the first banned term found in the given text, or null. */
+function findBannedTerm(text) {
+  const hay = stripAccents(text);
+  for (const term of BANNED_TERMS) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Whole-word match (with optional plural suffix), bounded by non-alphanumeric
+    // chars or string ends — so "cerveza" also catches "cervezas".
+    const re = new RegExp('(^|[^a-z0-9])' + escaped + '(es|s)?([^a-z0-9]|$)');
+    if (re.test(hay)) return term;
+  }
+  return null;
+}
+
 function validateListingInput(body) {
   const errors = [];
   const name = String(body.name || '').trim();
@@ -35,6 +75,11 @@ function validateListingInput(body) {
   if (!Number.isFinite(priceNum) || priceNum < 0 || priceNum > 1_000_000_000) errors.push('Precio inválido.');
   if (!VALID_CATEGORIES.has(category)) errors.push('Categoría inválida.');
   if (!VALID_CONDITIONS.has(condition)) errors.push('Condición inválida.');
+
+  // Prohibited content (illegal / restricted goods) — checked across title + description.
+  if (findBannedTerm(`${name} ${description}`)) {
+    errors.push('Este anuncio parece contener artículos no permitidos (drogas, alcohol, tabaco, armas o servicios sexuales). No podemos publicarlo.');
+  }
 
   return { errors, clean: { name, description, price: priceNum, category, condition, size } };
 }
@@ -256,6 +301,24 @@ router.get('/:id', async (req, res) => {
  * publicar"). A rejected upload happens AFTER enforceListingLimit, so we refund
  * any credit it consumed before responding.
  */
+/**
+ * Delete images already uploaded to Cloudinary for a request that is about to be
+ * rejected (validation/banned content/no-photo race), so rejected posts never
+ * leave orphaned images behind.
+ */
+async function deleteUploadedFiles(files) {
+  if (!files || !files.length) return;
+  try {
+    configureCloudinary();
+    const publicIds = files
+      .map(f => f.filename || getPublicIdFromUrl(f.path))
+      .filter(Boolean);
+    if (publicIds.length) await cloudinary.api.delete_resources(publicIds);
+  } catch (e) {
+    console.error('[POST /add] cleanup of rejected uploads failed:', e.message);
+  }
+}
+
 function uploadPhotos(req, res, next) {
   configureCloudinary(); // idempotent — guarantees credentials are set before upload
   upload.array('photos')(req, res, async (err) => {
@@ -290,6 +353,7 @@ router.post('/add',
       const { errors, clean } = validateListingInput(req.body);
       if (errors.length) {
         await refundCreditIfUsed(req);
+        await deleteUploadedFiles(req.files); // don't leave orphaned images for a rejected post
         return res.status(400).json({ error: errors.join(' '), code: 'VALIDATION' });
       }
       if (!req.files || req.files.length === 0) {
