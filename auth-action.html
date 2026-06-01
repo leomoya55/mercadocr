@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/images/logo-refined.svg" type="image/svg+xml">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MercaTico</title>
+    <meta name="robots" content="noindex">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/auth-action.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/" class="logo"><img src="/images/logo-refined.svg" class="logo-img" alt="" aria-hidden="true" width="50" height="42"><span>MercaTico</span></a>
+            <ul>
+                <li><a href="/">Inicio</a></li>
+                <li><a href="/listings">Anuncios</a></li>
+                <li><a href="/pricing">Planes</a></li>
+                <li><a href="/login">Iniciar sesión</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="aa-wrap">
+            <div class="aa-card" id="action-card">
+                <div class="aa-spinner"></div>
+                <h2>Procesando…</h2>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <nav class="footer-links">
+            <a href="/terminos">Términos y condiciones</a>
+            <a href="/privacidad">Política de privacidad</a>
+        </nav>
+        <p>&copy; 2026 MercaTico. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth-action.js?v=1"></script>
+</body>
+</html>
