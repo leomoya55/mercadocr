@@ -19,14 +19,21 @@ document.addEventListener('DOMContentLoaded', () => {
           const listingElement = document.createElement('a');
           listingElement.href = `/product?id=${listing._id}`;
           listingElement.classList.add('listing-item');
+          const isJob = listing.category === 'Empleos';
           const featuredBadge = listing.featured ? '<span class="badge-featured">Destacado</span>' : '';
           const photo = listing.photos && listing.photos[0] ? escapeHtml(cldAuto(listing.photos[0])) : '';
+          const imgHtml = photo
+            ? `<img src="${photo}" alt="${escapeHtml(listing.name)}" loading="lazy">`
+            : `<div class="listing-noimg" aria-hidden="true">${isJob ? '💼' : '🛍️'}</div>`;
+          const priceHtml = isJob
+            ? `<div class="listing-item-price">${escapeHtml(listing.job && listing.job.salary ? listing.job.salary : 'Empleo')}</div>`
+            : `<div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>`;
           listingElement.innerHTML = `
-            <img src="${photo}" alt="${escapeHtml(listing.name)}" loading="lazy">
+            ${imgHtml}
             <div class="listing-item-content">
               <div class="listing-item-title">${escapeHtml(listing.name)}</div>
               <div class="listing-item-meta">
-                <div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>
+                ${priceHtml}
                 ${featuredBadge}
               </div>
               ${listing.provincia ? `<div class="listing-item-location">📍 ${escapeHtml(listing.provincia)}</div>` : ''}

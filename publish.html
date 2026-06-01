@@ -21,6 +21,7 @@
             <ul>
                 <li><a href="/">Inicio</a></li>
                 <li><a href="/listings">Anuncios</a></li>
+                <li><a href="/listings?category=Empleos">Empleos</a></li>
                 <li class="nav-hidden" data-auth-only><a href="/publish" data-publish-cta>Publicar</a></li>
                 <li><a href="/pricing">Planes</a></li>
                 <li data-guest-only><a href="/login">Iniciar sesión</a></li>
@@ -82,6 +83,7 @@
                                 <option value="Hogar y muebles">Hogar y muebles</option>
                                 <option value="Vehículos">Vehículos</option>
                                 <option value="Bienes Raíces">Bienes Raíces</option>
+                                <option value="Empleos">Empleos</option>
                                 <option value="Servicios">Servicios</option>
                                 <option value="Otros">Otros</option>
                             </select>
@@ -163,7 +165,47 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="form-row">
+                        <div class="hidden" id="job-group">
+                            <div class="form-group">
+                                <label for="job_company">Empresa</label>
+                                <input type="text" id="job_company" name="job_company" placeholder="Nombre de la empresa">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="job_type">Jornada</label>
+                                    <select id="job_type" name="job_type">
+                                        <option value="" selected>Selecciona</option>
+                                        <option value="tiempo_completo">Tiempo completo</option>
+                                        <option value="medio_tiempo">Medio tiempo</option>
+                                        <option value="por_horas">Por horas</option>
+                                        <option value="temporal">Temporal</option>
+                                        <option value="freelance">Freelance</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="job_modality">Modalidad</label>
+                                    <select id="job_modality" name="job_modality">
+                                        <option value="" selected>Selecciona</option>
+                                        <option value="presencial">Presencial</option>
+                                        <option value="remoto">Remoto</option>
+                                        <option value="hibrido">Híbrido</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="job_salary">Salario <span style="color:#888;font-weight:400;">(opcional)</span></label>
+                                <input type="text" id="job_salary" name="job_salary" placeholder="Ej: ₡500.000/mes o A convenir">
+                            </div>
+                            <div class="form-group">
+                                <label for="job_apply_email">Correo para recibir aplicaciones</label>
+                                <input type="email" id="job_apply_email" name="job_apply_email" placeholder="empresa@correo.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="job_apply_url">Enlace para aplicar <span style="color:#888;font-weight:400;">(opcional)</span></label>
+                                <input type="url" id="job_apply_url" name="job_apply_url" placeholder="https://...">
+                            </div>
+                        </div>
+                        <div class="form-row" id="condition-price-row">
                             <div class="form-group">
                                 <label for="condition">Condición</label>
                                 <select id="condition" name="condition">
@@ -190,7 +232,7 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="images">Imágenes</label>
+                            <label for="images" id="images-label">Imágenes</label>
                             <input type="file" id="images" name="photos" multiple accept="image/*">
                         </div>
                     </div>
@@ -218,6 +260,6 @@
     <script src="js/user-store.js?v=12"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=13"></script>
-    <script src="js/publish.js?v=18"></script>
+    <script src="js/publish.js?v=19"></script>
 </body>
 </html>

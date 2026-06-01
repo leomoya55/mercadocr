@@ -58,13 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const dimmed = isSold || isExpired;
+      const isJob = listing.category === 'Empleos';
       const photo = listing.photos && listing.photos[0] ? escapeHtml(cldAuto(listing.photos[0])) : '';
+      const imgHtml = photo
+        ? `<img src="${photo}" alt="${escapeHtml(listing.name)}"${dimmed ? ' style="opacity:0.55"' : ''}>`
+        : `<div class="listing-noimg"${dimmed ? ' style="opacity:0.55"' : ''} aria-hidden="true">${isJob ? '💼' : '🛍️'}</div>`;
+      const priceHtml = isJob
+        ? `<div class="listing-item-price">${escapeHtml(listing.job && listing.job.salary ? listing.job.salary : 'Empleo')}</div>`
+        : `<div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>`;
       card.innerHTML = `
-        <img src="${photo}" alt="${escapeHtml(listing.name)}"${dimmed ? ' style="opacity:0.55"' : ''}>
+        ${imgHtml}
         <div class="listing-item-content">
           <div class="listing-item-title">${escapeHtml(listing.name)}</div>
           <div class="listing-item-meta">
-            <div class="listing-item-price">₡${Number(listing.price).toLocaleString('es-CR')}</div>
+            ${priceHtml}
             ${featuredBadge}${soldBadge}${expiredBadge}
           </div>
           ${statusNote}

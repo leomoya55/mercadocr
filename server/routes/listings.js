@@ -15,9 +15,32 @@ const { createListingLimiter } = require('../middleware/rateLimiters');
 // Must match the <option value="…"> values in publish.html exactly.
 const VALID_CATEGORIES = new Set([
   'Ropa y accesorios', 'Electrónica', 'Hogar y muebles',
-  'Vehículos', 'Bienes Raíces', 'Servicios', 'Otros',
+  'Vehículos', 'Bienes Raíces', 'Empleos', 'Servicios', 'Otros',
 ]);
 const VALID_CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'regular', '']);
+
+// Job (Empleos) option whitelists — must match the <option> values in publish.html.
+const JOB_CATEGORY     = 'Empleos';
+const VALID_JOB_TYPES  = new Set(['tiempo_completo', 'medio_tiempo', 'por_horas', 'temporal', 'freelance', '']);
+const VALID_MODALITIES = new Set(['presencial', 'remoto', 'hibrido', '']);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Parse + sanitize the job fields for an Empleos listing. */
+function parseJob(body) {
+  const employmentType = VALID_JOB_TYPES.has(String(body.job_type || '')) ? String(body.job_type || '') : '';
+  const modality       = VALID_MODALITIES.has(String(body.job_modality || '')) ? String(body.job_modality || '') : '';
+  let applyUrl = String(body.job_apply_url || '').trim().slice(0, 300);
+  if (applyUrl && !/^https?:\/\//i.test(applyUrl)) applyUrl = 'https://' + applyUrl;
+  if (applyUrl && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(applyUrl)) applyUrl = '';
+  return {
+    employmentType,
+    modality,
+    company:    String(body.job_company || '').trim().slice(0, 100),
+    salary:     String(body.job_salary || '').trim().slice(0, 60),
+    applyEmail: String(body.job_apply_email || '').trim().slice(0, 120),
+    applyUrl,
+  };
+}
 
 // Real-estate option whitelists — must match the <option> values in publish.html.
 const RE_CATEGORY      = 'Bienes Raíces';
@@ -86,8 +109,8 @@ function validateListingInput(body) {
   const errors = [];
   const name = String(body.name || '').trim();
   const description = String(body.description || '').trim();
-  const priceNum = Number(body.price);
   const category = String(body.category || '').trim();
+  const isJob = category === JOB_CATEGORY;
   const condition = body.condition === undefined ? '' : String(body.condition).trim();
   // Size only applies to the clothing category; ignored (stored as '') otherwise.
   const size = category === 'Ropa y accesorios'
@@ -97,19 +120,35 @@ function validateListingInput(body) {
   const realEstate = category === RE_CATEGORY
     ? parseRealEstate(body)
     : { operation: '', propertyType: '', area: null, bedrooms: null, bathrooms: null };
+  // Job details only apply to the Empleos category.
+  const job = isJob
+    ? parseJob(body)
+    : { employmentType: '', modality: '', company: '', salary: '', applyEmail: '', applyUrl: '' };
+
+  // Jobs have no price; everything else requires a valid one.
+  let priceNum = Number(body.price);
+  if (isJob) {
+    priceNum = 0;
+  } else if (!Number.isFinite(priceNum) || priceNum < 0 || priceNum > 1_000_000_000) {
+    errors.push('Precio inválido.');
+  }
 
   if (name.length < 3 || name.length > 100) errors.push('El título debe tener entre 3 y 100 caracteres.');
   if (description.length < 10 || description.length > 2000) errors.push('La descripción debe tener entre 10 y 2000 caracteres.');
-  if (!Number.isFinite(priceNum) || priceNum < 0 || priceNum > 1_000_000_000) errors.push('Precio inválido.');
   if (!VALID_CATEGORIES.has(category)) errors.push('Categoría inválida.');
   if (!VALID_CONDITIONS.has(condition)) errors.push('Condición inválida.');
+
+  // Empleos requires a valid contact email so applicants can apply.
+  if (isJob && !EMAIL_RE.test(job.applyEmail)) {
+    errors.push('Ingresá un correo electrónico válido para recibir las aplicaciones.');
+  }
 
   // Prohibited content (illegal / restricted goods) — checked across title + description.
   if (findBannedTerm(`${name} ${description}`)) {
     errors.push('Este anuncio parece contener artículos no permitidos (drogas, alcohol, tabaco, armas o servicios sexuales). No podemos publicarlo.');
   }
 
-  return { errors, clean: { name, description, price: priceNum, category, condition, size, realEstate } };
+  return { errors, clean: { name, description, price: priceNum, category, condition, size, realEstate, job } };
 }
 
 // ─── Public ──────────────────────────────────────────────────────────────────
@@ -398,7 +437,8 @@ router.post('/add',
         await deletePhotoUrls(photos);
         return res.status(400).json({ error: errors.join(' '), code: 'VALIDATION' });
       }
-      if (photos.length === 0) {
+      // Jobs (Empleos) don't require a photo; everything else does.
+      if (photos.length === 0 && clean.category !== JOB_CATEGORY) {
         await refundCreditIfUsed(req);
         return res.status(400).json({ error: 'Se requiere al menos una foto.', code: 'NO_PHOTO' });
       }
@@ -410,7 +450,7 @@ router.post('/add',
       const newListing = new Listing({
         name: clean.name, description: clean.description, price: clean.price,
         category: clean.category, condition: clean.condition, size: clean.size,
-        realEstate: clean.realEstate,
+        realEstate: clean.realEstate, job: clean.job,
         photos, contact, provincia,
         author: uid, featured: false,
       });
@@ -482,6 +522,7 @@ router.post('/update/:id',
       listing.condition    = clean.condition;
       listing.size         = clean.size;
       listing.realEstate   = clean.realEstate;
+      listing.job          = clean.job;
 
       // Replace photos only when the client uploaded new ones.
       const newPhotos = validatePhotoUrls(req.body.photos);

@@ -73,14 +73,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ─── Card builder ─────────────────────────────────────────────────────────
   function buildCard(listing) {
+    var isJob = listing.category === 'Empleos';
     var card = document.createElement('div');
     card.className = 'listing-item';
     card.setAttribute('role', 'link');
     card.setAttribute('tabindex', '0');
-    card.setAttribute(
-      'aria-label',
-      listing.name + ' — ₡' + Number(listing.price).toLocaleString('es-CR')
-    );
+    card.setAttribute('aria-label', listing.name);
     card.dataset.id = listing._id;
 
     var featuredBadge = listing.featured
@@ -91,7 +89,8 @@ document.addEventListener('DOMContentLoaded', function () {
       ? '<span class="badge-condition">' + CONDITION_LABELS[listing.condition] + '</span>'
       : '';
 
-    var waLink = (typeof buildWaLink === 'function') ? buildWaLink(listing.contact) : null;
+    // Jobs are contacted via the product page (email/link), not WhatsApp.
+    var waLink = (!isJob && typeof buildWaLink === 'function') ? buildWaLink(listing.contact) : null;
     var waBtn  = waLink
       ? '<a href="' + waLink + '"' +
           ' class="listing-wa-btn"' +
@@ -102,15 +101,26 @@ document.addEventListener('DOMContentLoaded', function () {
         '</a>'
       : '';
 
+    // Image, or a placeholder when there is none (jobs may have no photo).
+    var photo0 = (listing.photos && listing.photos[0]) ? cldAuto(listing.photos[0]) : '';
+    var imgHtml = photo0
+      ? '<img src="' + escapeHtml(photo0) + '" alt="' + escapeHtml(listing.name) +
+        '" loading="lazy" width="400" height="200">'
+      : '<div class="listing-noimg" aria-hidden="true">' + (isJob ? '💼' : '🛍️') + '</div>';
+
+    // Price for products; salary (or "Empleo") for jobs.
+    var priceHtml = isJob
+      ? '<div class="listing-item-price">' +
+          escapeHtml(listing.job && listing.job.salary ? listing.job.salary : 'Empleo') +
+        '</div>'
+      : '<div class="listing-item-price">₡' + Number(listing.price).toLocaleString('es-CR') + '</div>';
+
     card.innerHTML =
-      '<img src="' + escapeHtml(cldAuto(listing.photos[0])) + '"' +
-      ' alt="' + escapeHtml(listing.name) + '"' +
-      ' loading="lazy"' +
-      ' width="400" height="200">' +
+      imgHtml +
       '<div class="listing-item-content">' +
         '<div class="listing-item-title">' + escapeHtml(listing.name) + '</div>' +
         '<div class="listing-item-meta">' +
-          '<div class="listing-item-price">₡' + Number(listing.price).toLocaleString('es-CR') + '</div>' +
+          priceHtml +
           '<div class="listing-item-badges">' + conditionBadge + featuredBadge + waBtn + '</div>' +
         '</div>' +
         (listing.provincia

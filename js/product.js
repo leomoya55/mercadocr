@@ -112,6 +112,42 @@ document.addEventListener('DOMContentLoaded', function () {
           '</ul></div>'
         : '';
 
+      // Job details + apply buttons (Empleos only)
+      var isJob = product.category === 'Empleos';
+      var job = product.job || {};
+      var JOB_TYPE_LABELS = { tiempo_completo: 'Tiempo completo', medio_tiempo: 'Medio tiempo', por_horas: 'Por horas', temporal: 'Temporal', freelance: 'Freelance' };
+      var JOB_MOD_LABELS  = { presencial: 'Presencial', remoto: 'Remoto', hibrido: 'Híbrido' };
+      var jobRows = [];
+      if (isJob) {
+        if (job.company)        jobRows.push(['Empresa',   job.company]);
+        if (job.employmentType) jobRows.push(['Jornada',   JOB_TYPE_LABELS[job.employmentType] || job.employmentType]);
+        if (job.modality)       jobRows.push(['Modalidad', JOB_MOD_LABELS[job.modality] || job.modality]);
+        if (job.salary)         jobRows.push(['Salario',   job.salary]);
+      }
+      var jobHtml = jobRows.length
+        ? '<div class="product-realestate"><h3>Detalles del empleo</h3><ul>' +
+            jobRows.map(function (r) {
+              return '<li><span>' + escapeHtml(r[0]) + '</span><strong>' + escapeHtml(r[1]) + '</strong></li>';
+            }).join('') +
+          '</ul></div>'
+        : '';
+
+      var applyHtml = '';
+      if (isJob && job.applyEmail) {
+        var subject = encodeURIComponent('Aplicación: ' + (product.name || 'Empleo'));
+        applyHtml += '<a href="mailto:' + escapeHtml(job.applyEmail) + '?subject=' + subject +
+          '" class="wa-btn-large">✉️ Aplicar por correo</a>';
+      }
+      if (isJob && job.applyUrl) {
+        applyHtml += '<a href="' + escapeHtml(job.applyUrl) + '" target="_blank" rel="noopener noreferrer"' +
+          ' class="cta-button secondary" style="display:block;text-align:center;margin-top:0.6rem;">Aplicar en línea →</a>';
+      }
+
+      // Price line: ₡ for products, salary (or nothing) for jobs.
+      var priceHtml = isJob
+        ? (job.salary ? '<div class="product-price">' + escapeHtml(job.salary) + '</div>' : '')
+        : '<div class="product-price">₡' + Number(product.price).toLocaleString('es-CR') + priceSuffix + '</div>';
+
       container.innerHTML =
         '<div class="product-grid">' +
           '<div class="product-images-col">' +
@@ -121,9 +157,10 @@ document.addEventListener('DOMContentLoaded', function () {
             '<h1>' + escapeHtml(product.name) +
               (featuredBadge ? ' ' + featuredBadge : '') +
             '</h1>' +
-            '<div class="product-price">₡' + Number(product.price).toLocaleString('es-CR') + priceSuffix + '</div>' +
+            priceHtml +
             viewsHtml +
             reHtml +
+            jobHtml +
             (product.size
               ? '<div class="product-size"><h3>Talla</h3><p>' + escapeHtml(product.size) + '</p></div>'
               : '') +
@@ -135,10 +172,10 @@ document.addEventListener('DOMContentLoaded', function () {
               ? '<div class="product-location"><h3>Ubicación</h3><p>📍 ' + escapeHtml(product.provincia) + '</p></div>'
               : '') +
             '<div class="product-seller">' +
-              '<h3>Vendedor</h3>' +
+              '<h3>' + (isJob ? 'Publicado por' : 'Vendedor') + '</h3>' +
               '<p>' + sellerName + '</p>' +
             '</div>' +
-            waHtml +
+            (isJob ? applyHtml : waHtml) +
             '<button type="button" class="report-btn" id="report-btn" data-listing-id="' + escapeHtml(product._id) + '">' +
               '⚑ Reportar anuncio' +
             '</button>' +

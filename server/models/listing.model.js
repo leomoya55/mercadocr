@@ -18,6 +18,15 @@ const listingSchema = new mongoose.Schema({
     bedrooms:     { type: Number, default: null },
     bathrooms:    { type: Number, default: null },
   },
+  // Job details — only used for the 'Empleos' category.
+  job: {
+    employmentType: { type: String, default: '' }, // tiempo_completo, medio_tiempo, por_horas, temporal, freelance
+    modality:       { type: String, default: '' }, // presencial, remoto, hibrido
+    company:        { type: String, default: '' },
+    salary:         { type: String, default: '' }, // free text, e.g. "₡500.000/mes" or "A convenir"
+    applyEmail:     { type: String, default: '' }, // how applicants apply (required for Empleos)
+    applyUrl:       { type: String, default: '' }, // optional external application link
+  },
   condition:   {
     type: String,
     enum: ['new', 'like_new', 'good', 'fair', 'regular', ''],

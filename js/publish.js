@@ -164,10 +164,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const sizeGroup      = document.getElementById('size-group');
   const sizeSelect     = document.getElementById('size');
   const realestateGroup = document.getElementById('realestate-group');
+  const jobGroup        = document.getElementById('job-group');
+  const conditionPriceRow = document.getElementById('condition-price-row');
+  const imagesLabel     = document.getElementById('images-label');
   const SIZE_CATEGORY  = 'Ropa y accesorios';
   const RE_CATEGORY    = 'Bienes Raíces';
+  const JOB_CATEGORY   = 'Empleos';
   // Real-estate inputs, cleared whenever the category isn't Bienes Raíces.
   const reFields = ['re_operation', 're_type', 're_area', 're_bedrooms', 're_bathrooms']
+    .map((id) => document.getElementById(id));
+  // Job inputs, cleared whenever the category isn't Empleos.
+  const jobFields = ['job_company', 'job_type', 'job_modality', 'job_salary', 'job_apply_email', 'job_apply_url']
     .map((id) => document.getElementById(id));
 
   function updateCategoryFields() {
@@ -176,6 +183,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const showSize = value === SIZE_CATEGORY;
     if (sizeGroup) sizeGroup.classList.toggle('hidden', !showSize);
     if (!showSize && sizeSelect) sizeSelect.value = '';
+
+    // Empleos: show job fields, hide the condition/price row, photos optional.
+    const showJob = value === JOB_CATEGORY;
+    if (jobGroup) jobGroup.classList.toggle('hidden', !showJob);
+    if (conditionPriceRow) conditionPriceRow.classList.toggle('hidden', showJob);
+    if (imagesLabel) imagesLabel.textContent = showJob ? 'Imágenes (opcional)' : 'Imágenes';
+    if (!showJob) jobFields.forEach((el) => { if (el) el.value = ''; });
 
     const showRe = value === RE_CATEGORY;
     if (realestateGroup) realestateGroup.classList.toggle('hidden', !showRe);
@@ -253,6 +267,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setVal('re_area',      re.area);
     setVal('re_bedrooms',  re.bedrooms);
     setVal('re_bathrooms', re.bathrooms);
+    // Pre-fill job fields when editing an Empleos listing.
+    const jb = listing.job || {};
+    setVal('job_company',     jb.company || '');
+    setVal('job_type',        jb.employmentType || '');
+    setVal('job_modality',    jb.modality || '');
+    setVal('job_salary',      jb.salary || '');
+    setVal('job_apply_email', jb.applyEmail || '');
+    setVal('job_apply_url',   jb.applyUrl || '');
     updateCategoryFields();
     submitButton.textContent = 'Guardar cambios';
     showForm();
@@ -357,16 +379,25 @@ document.addEventListener('DOMContentLoaded', () => {
         Toast.error('Selecciona una categoría.');
         return;
       }
-      if (!priceHidden.value || Number(priceHidden.value) < 0) {
+      const isJob = form.category.value === 'Empleos';
+      // Jobs have no price and don't require a photo, but need a contact email.
+      if (!isJob && (!priceHidden.value || Number(priceHidden.value) < 0)) {
         Toast.error('Ingresá un precio válido.');
         return;
+      }
+      if (isJob) {
+        const email = (document.getElementById('job_apply_email') || {}).value || '';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+          Toast.error('Ingresá un correo válido para recibir las aplicaciones.');
+          return;
+        }
       }
       const descriptionValue = descriptionInput.value || '';
       if (descriptionValue.length < minDescriptionLength) {
         Toast.error(`La descripción debe tener al menos ${minDescriptionLength} caracteres.`);
         return;
       }
-      if (!isEditMode && imagesInput && (!imagesInput.files || imagesInput.files.length === 0)) {
+      if (!isJob && !isEditMode && imagesInput && (!imagesInput.files || imagesInput.files.length === 0)) {
         Toast.error('Agregá al menos una foto de tu anuncio.');
         return;
       }
@@ -385,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         if (imageFiles.length > 0) {
           uploadedPhotos = await uploadImagesDirect(imageFiles);
-        } else if (!isEditMode) {
+        } else if (!isEditMode && !isJob) {
           Toast.error('Agregá al menos una foto de tu anuncio.');
           submitButton.disabled = false;
           submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
@@ -412,6 +443,12 @@ document.addEventListener('DOMContentLoaded', () => {
         re_area: document.getElementById('re_area')?.value || '',
         re_bedrooms: document.getElementById('re_bedrooms')?.value || '',
         re_bathrooms: document.getElementById('re_bathrooms')?.value || '',
+        job_company: document.getElementById('job_company')?.value || '',
+        job_type: document.getElementById('job_type')?.value || '',
+        job_modality: document.getElementById('job_modality')?.value || '',
+        job_salary: document.getElementById('job_salary')?.value || '',
+        job_apply_email: document.getElementById('job_apply_email')?.value || '',
+        job_apply_url: document.getElementById('job_apply_url')?.value || '',
       };
       if (uploadedPhotos.length > 0) payload.photos = uploadedPhotos;
 
