@@ -197,6 +197,52 @@ app.get('/product', async (req, res, next) => {
   }
 });
 
+// ─── Social link-preview (Open Graph) for the home + listings pages ──────────
+//
+// Injects og:/twitter: meta so links shared on WhatsApp/Facebook show a title,
+// description and the logo image. Uses the request host so the absolute image
+// URL is correct on any domain (vercel.app today, a custom domain later).
+// Product pages get their own dynamic OG above; this covers the entry pages.
+const _ogPages = {
+  '/':         { title: 'MercaTico — Compra y vende en Costa Rica', desc: 'El mercado digital de Costa Rica. Compra y vende productos nuevos y usados cerca de ti.' },
+  '/listings': { title: 'Anuncios - MercaTico', desc: 'Explora anuncios de Costa Rica: ropa, electrónica, hogar, vehículos, bienes raíces y más.' },
+};
+app.get(['/', '/listings'], (req, res, next) => {
+  try {
+    const meta = _ogPages[req.path];
+    if (!meta) return next();
+    const file = req.path === '/listings' ? 'listings.html' : 'index.html';
+    let html = fs.readFileSync(path.join(__dirname, '../', file), 'utf8');
+
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
+    const base  = proto + '://' + req.headers.host;
+    const img   = base + '/images/estasies.png';
+    const url   = base + req.path;
+    const esc   = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const tags =
+      `  <meta name="description" content="${esc(meta.desc)}">\n` +
+      `  <meta property="og:title" content="${esc(meta.title)}">\n` +
+      `  <meta property="og:description" content="${esc(meta.desc)}">\n` +
+      `  <meta property="og:type" content="website">\n` +
+      `  <meta property="og:url" content="${esc(url)}">\n` +
+      `  <meta property="og:image" content="${esc(img)}">\n` +
+      `  <meta property="og:site_name" content="MercaTico">\n` +
+      `  <meta name="twitter:card" content="summary_large_image">\n` +
+      `  <meta name="twitter:title" content="${esc(meta.title)}">\n` +
+      `  <meta name="twitter:description" content="${esc(meta.desc)}">\n` +
+      `  <meta name="twitter:image" content="${esc(img)}">\n`;
+
+    html = html.replace('</head>', tags + '</head>');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    res.send(html);
+  } catch (err) {
+    console.error('[OG home/listings]', err.message);
+    next(); // fall through to static on any error
+  }
+});
+
 // Serve static frontend from project root.
 // HTML is served with no-cache so browsers (esp. mobile Safari) always pick up
 // the latest markup — otherwise a stale cached page keeps loading old form/JS

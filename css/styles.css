@@ -228,6 +228,23 @@ footer {
     background-color: #121212;
 }
 
+.footer-links {
+    display: flex;
+    gap: 1.25rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+    padding: 0;
+}
+
+.footer-links a {
+    color: #aaa;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.footer-links a:hover { color: #e8c97a; }
+
 .hidden {
     display: none !important;
 }
