@@ -1,3 +1,5 @@
+import imageCompression from 'https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.mjs';
+
 document.addEventListener('DOMContentLoaded', () => {
   const form          = document.getElementById('publish-form');
   const submitButton  = document.getElementById('submit-button');
@@ -123,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── Live image preview ─────────────────────────────────────────────────────
   const imagesInput      = document.getElementById('images');
   const previewContainer = document.getElementById('image-preview-container');
+  const MAX_IMAGES = 10;
 
   function renderImagePreviews() {
     if (!previewContainer) return;
@@ -142,7 +145,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (imagesInput) imagesInput.addEventListener('change', renderImagePreviews);
+  if (imagesInput) {
+    imagesInput.addEventListener('change', () => {
+      const files = Array.from(imagesInput.files);
+      if (files.length > MAX_IMAGES) {
+        Toast.info(`Puedes subir un máximo de ${MAX_IMAGES} fotos. Se usarán las primeras ${MAX_IMAGES}.`);
+        // Create a new FileList object with the first 10 files
+        const dataTransfer = new DataTransfer();
+        for (let i = 0; i < MAX_IMAGES; i++) {
+          dataTransfer.items.add(files[i]);
+        }
+        imagesInput.files = dataTransfer.files;
+      }
+      renderImagePreviews();
+    });
+  }
 
   // ─── Category-specific fields (clothing size / real-estate details) ──────────
   const categorySelect = document.getElementById('category');
@@ -313,11 +330,48 @@ document.addEventListener('DOMContentLoaded', () => {
         Toast.error('Agregá al menos una foto de tu anuncio.');
         return;
       }
+      if (imagesInput && imagesInput.files.length > MAX_IMAGES) {
+        Toast.error(`Puedes subir un máximo de ${MAX_IMAGES} fotos.`);
+        return;
+      }
 
       submitButton.disabled = true;
       submitButton.textContent = 'Publicando...';
 
-      const formData = new FormData(form);
+      const formData = new FormData();
+      // Manually append all fields EXCEPT files
+      for (const [key, value] of new FormData(form).entries()) {
+        if (key !== 'images') {
+          formData.append(key, value);
+        }
+      }
+
+      // Compress and append images
+      const imageFiles = imagesInput ? Array.from(imagesInput.files) : [];
+      if (imageFiles.length > 0) {
+        setStatus('Comprimiendo imágenes...');
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
+        try {
+          const compressedFiles = await Promise.all(imageFiles.map(file => imageCompression(file, options)));
+          compressedFiles.forEach(file => {
+            formData.append('images', file, file.name);
+          });
+        } catch (compressionError) {
+          console.error('Image compression error:', compressionError);
+          Toast.error('Hubo un error al procesar las imágenes. Intenta con otras fotos.');
+          submitButton.disabled = false;
+          submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
+          setStatus('');
+          return;
+        }
+        setStatus('');
+      }
+
+
       const listingName = formData.get('name') || '';
 
       try {

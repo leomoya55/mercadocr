@@ -5,6 +5,7 @@ const User    = require('../models/user.model');
 const { upload, cloudinary, configureCloudinary, getPublicIdFromUrl } = require('../config/cloudinary');
 const { verifyToken }          = require('../middleware/auth');
 const { ensureUser }           = require('../middleware/ensureUser');
+const ensureVerified         = require('../middleware/ensureVerified');
 const { enforceListingLimit, getActiveCount, refundCreditIfUsed } = require('../middleware/listingLimits');
 const { isOwner }              = require('../config/plans');
 const { canFeatureListing }    = require('../config/featured');
@@ -365,11 +366,12 @@ function uploadPhotos(req, res, next) {
 }
 
 router.post('/add',
+  createListingLimiter,
   verifyToken,
-  createListingLimiter,   // anti-spam: keyed by uid, runs after verifyToken sets req.uid
   ensureUser,
+  ensureVerified,
   enforceListingLimit,
-  uploadPhotos,
+  upload.array('images', 10),
   async (req, res) => {
     try {
       const uid  = req.uid;
@@ -438,8 +440,13 @@ router.post('/add',
  * Only the owner of the listing can update it.
  * Replaces photos only when new files are uploaded.
  */
-router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res) => {
-  try {
+router.put('/:id',
+  verifyToken,
+  ensureUser,
+  ensureVerified,
+  upload.array('images', 10),
+  async (req, res) => {
+    configureCloudinary();
     const uid     = req.uid;
     const listing = await Listing.findById(req.params.id);
     if (!listing)             return res.status(404).json('Listing not found');

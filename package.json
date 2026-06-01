@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "main": "server/server.js",
   "dependencies": {
+    "browser-image-compression": "^2.0.2",
     "dotenv": "^17.4.2"
   }
 }

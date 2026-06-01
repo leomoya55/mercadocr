@@ -29,7 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const OWNER_EMAIL = 'leomoyawr300@gmail.com';
 
     // Show/hide nav items based on auth state
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
+        const isVerified = user && user.emailVerified;
+
+        // Redirect unverified users from protected pages
+        const protectedPaths = ['/dashboard.html', '/publish.html', '/settings.html', '/admin.html', '/listings.html'];
+        if (user && !isVerified && protectedPaths.includes(window.location.pathname)) {
+            window.location.href = '/verify-email.html';
+            return;
+        }
+
         document.querySelectorAll('[data-auth-only]').forEach(el => {
             el.classList.toggle('nav-hidden', !user);
         });
@@ -39,7 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Admin link — only visible to the owner account
         document.querySelectorAll('[data-admin-only]').forEach(el => {
-            el.classList.toggle('nav-hidden', !user || user.email !== OWNER_EMAIL);
+            const isOwner = user && user.email === OWNER_EMAIL;
+            el.classList.toggle('nav-hidden', !isOwner);
         });
 
         if (user) {
