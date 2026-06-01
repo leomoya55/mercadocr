@@ -90,6 +90,28 @@ document.addEventListener('DOMContentLoaded', function () {
         ? '<div class="product-views">👁 ' + Number(product.views).toLocaleString('es-CR') + ' visitas</div>'
         : '';
 
+      // Real-estate details (Bienes Raíces only)
+      var re = product.realEstate || {};
+      var isRealEstate = product.category === 'Bienes Raíces';
+      var RE_OP_LABELS   = { alquiler: 'Alquiler', venta: 'Venta' };
+      var RE_TYPE_LABELS = { casa: 'Casa', apartamento: 'Apartamento', lote: 'Lote / Terreno', local: 'Local comercial', oficina: 'Oficina', bodega: 'Bodega', finca: 'Finca' };
+      var priceSuffix = (isRealEstate && re.operation === 'alquiler') ? '<span> /mes</span>' : '';
+      var reRows = [];
+      if (isRealEstate) {
+        if (re.operation)          reRows.push(['Operación',    RE_OP_LABELS[re.operation] || re.operation]);
+        if (re.propertyType)       reRows.push(['Tipo',         RE_TYPE_LABELS[re.propertyType] || re.propertyType]);
+        if (re.area != null)       reRows.push(['Área',         re.area + ' m²']);
+        if (re.bedrooms != null)   reRows.push(['Habitaciones', String(re.bedrooms)]);
+        if (re.bathrooms != null)  reRows.push(['Baños',        String(re.bathrooms)]);
+      }
+      var reHtml = reRows.length
+        ? '<div class="product-realestate"><h3>Detalles de la propiedad</h3><ul>' +
+            reRows.map(function (r) {
+              return '<li><span>' + escapeHtml(r[0]) + '</span><strong>' + escapeHtml(r[1]) + '</strong></li>';
+            }).join('') +
+          '</ul></div>'
+        : '';
+
       container.innerHTML =
         '<div class="product-grid">' +
           '<div class="product-images-col">' +
@@ -99,8 +121,9 @@ document.addEventListener('DOMContentLoaded', function () {
             '<h1>' + escapeHtml(product.name) +
               (featuredBadge ? ' ' + featuredBadge : '') +
             '</h1>' +
-            '<div class="product-price">₡' + Number(product.price).toLocaleString('es-CR') + '</div>' +
+            '<div class="product-price">₡' + Number(product.price).toLocaleString('es-CR') + priceSuffix + '</div>' +
             viewsHtml +
+            reHtml +
             (product.size
               ? '<div class="product-size"><h3>Talla</h3><p>' + escapeHtml(product.size) + '</p></div>'
               : '') +

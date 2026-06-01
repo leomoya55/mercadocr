@@ -10,6 +10,14 @@ const listingSchema = new mongoose.Schema({
   category:    { type: String, required: true },
   // Apparel size — only used for the 'Ropa y accesorios' category; '' otherwise.
   size:        { type: String, default: '' },
+  // Real-estate details — only used for the 'Bienes Raíces' category.
+  realEstate: {
+    operation:    { type: String, enum: ['alquiler', 'venta', ''], default: '' },
+    propertyType: { type: String, default: '' }, // casa, apartamento, lote, local, oficina, bodega, finca
+    area:         { type: Number, default: null }, // metros cuadrados (m²)
+    bedrooms:     { type: Number, default: null },
+    bathrooms:    { type: Number, default: null },
+  },
   condition:   {
     type: String,
     enum: ['new', 'like_new', 'good', 'fair', 'regular', ''],

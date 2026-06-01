@@ -95,6 +95,11 @@
     min-width: 0; /* lets grid children shrink instead of overflowing */
 }
 
+/* Three fields in a row (e.g. área / habitaciones / baños). */
+.form-row-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
 #publish-form label {
     font-weight: bold;
 }

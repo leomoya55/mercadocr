@@ -180,6 +180,35 @@
   white-space: pre-line;
 }
 
+/* ─── Real-estate details ──────────────────────────────────────────────────── */
+.product-realestate h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.05rem;
+  color: #e8c97a;
+}
+
+.product-realestate ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem 1.2rem;
+}
+
+.product-realestate li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #141414;
+  border: 1px solid #222;
+  border-radius: 8px;
+}
+
+.product-realestate li span { color: #aaa; }
+.product-realestate li strong { color: #fff; }
+
 .product-seller p {
   margin: 0.2rem 0;
   color: #ccc;

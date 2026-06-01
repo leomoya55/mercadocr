@@ -81,6 +81,7 @@
                                 <option value="Electrónica">Electrónica</option>
                                 <option value="Hogar y muebles">Hogar y muebles</option>
                                 <option value="Vehículos">Vehículos</option>
+                                <option value="Bienes Raíces">Bienes Raíces</option>
                                 <option value="Servicios">Servicios</option>
                                 <option value="Otros">Otros</option>
                             </select>
@@ -122,6 +123,45 @@
                                     <option value="XXXL">XXXL</option>
                                 </optgroup>
                             </select>
+                        </div>
+                        <div class="hidden" id="realestate-group">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="re_operation">Operación</label>
+                                    <select id="re_operation" name="re_operation">
+                                        <option value="" selected>Selecciona</option>
+                                        <option value="alquiler">Alquiler</option>
+                                        <option value="venta">Venta</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="re_type">Tipo de propiedad</label>
+                                    <select id="re_type" name="re_type">
+                                        <option value="" selected>Selecciona</option>
+                                        <option value="casa">Casa</option>
+                                        <option value="apartamento">Apartamento</option>
+                                        <option value="lote">Lote / Terreno</option>
+                                        <option value="local">Local comercial</option>
+                                        <option value="oficina">Oficina</option>
+                                        <option value="bodega">Bodega</option>
+                                        <option value="finca">Finca</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row form-row-3">
+                                <div class="form-group">
+                                    <label for="re_area">Área (m²)</label>
+                                    <input type="number" id="re_area" name="re_area" min="0" inputmode="numeric" placeholder="Ej: 120">
+                                </div>
+                                <div class="form-group">
+                                    <label for="re_bedrooms">Habitaciones</label>
+                                    <input type="number" id="re_bedrooms" name="re_bedrooms" min="0" inputmode="numeric" placeholder="Ej: 3">
+                                </div>
+                                <div class="form-group">
+                                    <label for="re_bathrooms">Baños</label>
+                                    <input type="number" id="re_bathrooms" name="re_bathrooms" min="0" inputmode="numeric" placeholder="Ej: 2">
+                                </div>
+                            </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -174,6 +214,6 @@
     <script src="js/user-store.js?v=12"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=12"></script>
-    <script src="js/publish.js?v=15"></script>
+    <script src="js/publish.js?v=16"></script>
 </body>
 </html>

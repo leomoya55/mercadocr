@@ -144,21 +144,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (imagesInput) imagesInput.addEventListener('change', renderImagePreviews);
 
-  // ─── Size field (only for the clothing category) ─────────────────────────────
+  // ─── Category-specific fields (clothing size / real-estate details) ──────────
   const categorySelect = document.getElementById('category');
   const sizeGroup      = document.getElementById('size-group');
   const sizeSelect     = document.getElementById('size');
+  const realestateGroup = document.getElementById('realestate-group');
   const SIZE_CATEGORY  = 'Ropa y accesorios';
+  const RE_CATEGORY    = 'Bienes Raíces';
+  // Real-estate inputs, cleared whenever the category isn't Bienes Raíces.
+  const reFields = ['re_operation', 're_type', 're_area', 're_bedrooms', 're_bathrooms']
+    .map((id) => document.getElementById(id));
 
-  function updateSizeVisibility() {
-    if (!sizeGroup) return;
-    const show = categorySelect && categorySelect.value === SIZE_CATEGORY;
-    sizeGroup.classList.toggle('hidden', !show);
-    // Clear the size when it doesn't apply, so we never store a stale value.
-    if (!show && sizeSelect) sizeSelect.value = '';
+  function updateCategoryFields() {
+    const value = categorySelect ? categorySelect.value : '';
+
+    const showSize = value === SIZE_CATEGORY;
+    if (sizeGroup) sizeGroup.classList.toggle('hidden', !showSize);
+    if (!showSize && sizeSelect) sizeSelect.value = '';
+
+    const showRe = value === RE_CATEGORY;
+    if (realestateGroup) realestateGroup.classList.toggle('hidden', !showRe);
+    if (!showRe) reFields.forEach((el) => { if (el) el.value = ''; });
   }
 
-  if (categorySelect) categorySelect.addEventListener('change', updateSizeVisibility);
+  if (categorySelect) categorySelect.addEventListener('change', updateCategoryFields);
 
 
   // ─── Plan UI helpers ──────────────────────────────────────────────────────
@@ -221,7 +230,15 @@ document.addEventListener('DOMContentLoaded', () => {
     form.category.value    = listing.category;
     if (form.condition) form.condition.value = listing.condition || '';
     if (sizeSelect) sizeSelect.value = listing.size || '';
-    updateSizeVisibility();
+    // Pre-fill real-estate fields when editing a Bienes Raíces listing.
+    const re = listing.realEstate || {};
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = (val === null || val === undefined) ? '' : val; };
+    setVal('re_operation', re.operation || '');
+    setVal('re_type',      re.propertyType || '');
+    setVal('re_area',      re.area);
+    setVal('re_bedrooms',  re.bedrooms);
+    setVal('re_bathrooms', re.bathrooms);
+    updateCategoryFields();
     submitButton.textContent = 'Guardar cambios';
     showForm();
     // Manually trigger input events to update counters

@@ -14,9 +14,31 @@ const { createListingLimiter } = require('../middleware/rateLimiters');
 // Must match the <option value="…"> values in publish.html exactly.
 const VALID_CATEGORIES = new Set([
   'Ropa y accesorios', 'Electrónica', 'Hogar y muebles',
-  'Vehículos', 'Servicios', 'Otros',
+  'Vehículos', 'Bienes Raíces', 'Servicios', 'Otros',
 ]);
 const VALID_CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'regular', '']);
+
+// Real-estate option whitelists — must match the <option> values in publish.html.
+const RE_CATEGORY      = 'Bienes Raíces';
+const VALID_RE_OPS     = new Set(['alquiler', 'venta', '']);
+const VALID_RE_TYPES   = new Set(['casa', 'apartamento', 'lote', 'local', 'oficina', 'bodega', 'finca', '']);
+
+/** Parse + sanitize the real-estate fields for a Bienes Raíces listing. */
+function parseRealEstate(body) {
+  const operation    = VALID_RE_OPS.has(String(body.re_operation || '')) ? String(body.re_operation || '') : '';
+  const propertyType = VALID_RE_TYPES.has(String(body.re_type || '')) ? String(body.re_type || '') : '';
+  const toNum = (v, max) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+  };
+  return {
+    operation,
+    propertyType,
+    area:      toNum(body.re_area, 1_000_000),
+    bedrooms:  toNum(body.re_bedrooms, 50),
+    bathrooms: toNum(body.re_bathrooms, 50),
+  };
+}
 
 // ─── Prohibited-content filter ───────────────────────────────────────────────
 // Blocks listings for illegal / restricted goods (drugs, alcohol, tobacco,
@@ -69,6 +91,10 @@ function validateListingInput(body) {
   const size = category === 'Ropa y accesorios'
     ? String(body.size || '').trim().slice(0, 30)
     : '';
+  // Real-estate details only apply to the Bienes Raíces category.
+  const realEstate = category === RE_CATEGORY
+    ? parseRealEstate(body)
+    : { operation: '', propertyType: '', area: null, bedrooms: null, bathrooms: null };
 
   if (name.length < 3 || name.length > 100) errors.push('El título debe tener entre 3 y 100 caracteres.');
   if (description.length < 10 || description.length > 2000) errors.push('La descripción debe tener entre 10 y 2000 caracteres.');
@@ -81,7 +107,7 @@ function validateListingInput(body) {
     errors.push('Este anuncio parece contener artículos no permitidos (drogas, alcohol, tabaco, armas o servicios sexuales). No podemos publicarlo.');
   }
 
-  return { errors, clean: { name, description, price: priceNum, category, condition, size } };
+  return { errors, clean: { name, description, price: priceNum, category, condition, size, realEstate } };
 }
 
 // ─── Public ──────────────────────────────────────────────────────────────────
@@ -369,6 +395,7 @@ router.post('/add',
       const newListing = new Listing({
         name: clean.name, description: clean.description, price: clean.price,
         category: clean.category, condition: clean.condition, size: clean.size,
+        realEstate: clean.realEstate,
         photos, contact, provincia,
         author: uid, featured: false,
       });
@@ -436,6 +463,10 @@ router.post('/update/:id', verifyToken, upload.array('photos'), async (req, res)
     listing.size = category === 'Ropa y accesorios'
       ? String(req.body.size || '').trim().slice(0, 30)
       : '';
+    // Real-estate details only apply to the Bienes Raíces category; cleared otherwise.
+    listing.realEstate = category === RE_CATEGORY
+      ? parseRealEstate(req.body)
+      : { operation: '', propertyType: '', area: null, bedrooms: null, bathrooms: null };
     if (req.files && req.files.length > 0) {
       listing.photos = req.files.map(f => f.path);
     }
