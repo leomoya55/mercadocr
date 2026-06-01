@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const priceHidden = document.getElementById('price-hidden');
   const descriptionInput = document.getElementById('description');
   const descriptionCounter = document.getElementById('description-counter');
-  const minDescriptionLength = 20;
+  const minDescriptionLength = 10; // matches the server minimum; less friction to publish
 
   if (priceInput && priceHidden) {
     priceInput.addEventListener('input', () => {
@@ -120,47 +120,153 @@ document.addEventListener('DOMContentLoaded', () => {
     descriptionInput.dispatchEvent(new Event('input'));
   }
 
-  // ─── Live image preview ─────────────────────────────────────────────────────
+  // ─── Image pipeline: compress + upload on SELECT (not on submit) ─────────────
+  //
+  // WHY: the old flow only began uploading after the user pressed "Publicar", so
+  // they stared at "Subiendo imágenes..." for the full network time. Now each
+  // photo is compressed (browser-image-compression) and uploaded to Cloudinary in
+  // the BACKGROUND the moment it's chosen — while the user is still typing the
+  // title/description. By the time they submit, the photos are usually already up,
+  // so publishing feels instant. Each thumbnail shows its own status (⏳/✓/⚠).
+  //
+  // Trade-off: a user who selects photos then abandons the page leaves orphaned
+  // Cloudinary images (never attached to a listing). That's a small storage cost;
+  // a periodic orphan-sweep is recommended in the launch review.
   const imagesInput      = document.getElementById('images');
   const previewContainer = document.getElementById('image-preview-container');
   const MAX_IMAGES = 10;
 
-  function renderImagePreviews() {
+  // Each entry: { file, status:'uploading'|'done'|'error', url, error, el, promise }
+  let uploadItems = [];
+  let cachedSig   = null; // one Cloudinary signature reused for the whole session
+
+  async function getUploadSignature() {
+    if (cachedSig && cachedSig.expires > Date.now()) return cachedSig;
+    const response = await authFetch('/api/listings/upload-signature', { method: 'POST' });
+    if (!response.ok) {
+      const raw = await response.text().catch(() => '');
+      throw new Error(raw || 'No se pudo preparar la subida de imágenes.');
+    }
+    const sig = await response.json();
+    sig.expires = Date.now() + 50 * 60 * 1000; // signatures last ~1h; refresh early
+    cachedSig = sig;
+    return sig;
+  }
+
+  // Shrink large phone photos before upload. Falls back to the original file if
+  // the library is unavailable or can't process the format (e.g. some HEIC).
+  async function compressIfNeeded(file) {
+    if (typeof imageCompression !== 'function') return file;
+    if (!file.type || !file.type.startsWith('image/')) return file;
+    try {
+      return await imageCompression(file, {
+        maxSizeMB: 0.9,
+        maxWidthOrHeight: 1600,
+        useWebWorker: true,
+        initialQuality: 0.8,
+      });
+    } catch (e) {
+      console.warn('[publish] compression failed, using original:', e.message);
+      return file;
+    }
+  }
+
+  function setItemStatus(item, status) {
+    item.status = status;
+    if (!item.el) return;
+    item.el.classList.remove('is-uploading', 'is-done', 'is-error');
+    item.el.classList.add('is-' + status);
+    const badge = item.el.querySelector('.thumb-badge');
+    if (badge) {
+      badge.textContent = status === 'done' ? '✓' : status === 'error' ? '⚠' : '';
+    }
+  }
+
+  function buildThumb(item) {
+    const thumb = document.createElement('div');
+    thumb.className = 'preview-thumb is-uploading';
+    const url = URL.createObjectURL(item.file);
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = item.file.name || '';
+    img.addEventListener('load', () => URL.revokeObjectURL(url));
+    const badge = document.createElement('span');
+    badge.className = 'thumb-badge';
+    const spinner = document.createElement('span');
+    spinner.className = 'thumb-spinner';
+    thumb.appendChild(img);
+    thumb.appendChild(spinner);
+    thumb.appendChild(badge);
+    item.el = thumb;
+    previewContainer.appendChild(thumb);
+  }
+
+  async function uploadOne(item) {
+    try {
+      const file = await compressIfNeeded(item.file);
+      const sig  = await getUploadSignature();
+      const data = new FormData();
+      data.append('file', file);
+      data.append('api_key', sig.apiKey);
+      data.append('timestamp', sig.timestamp);
+      data.append('signature', sig.signature);
+      if (sig.folder) data.append('folder', sig.folder);
+
+      const r = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
+        method: 'POST', body: data,
+      });
+      const payload = await r.json().catch(() => ({}));
+      if (!r.ok || !payload.secure_url) {
+        throw new Error((payload.error && payload.error.message) || 'No se pudo subir la imagen.');
+      }
+      item.url = payload.secure_url;
+      setItemStatus(item, 'done');
+    } catch (e) {
+      item.error = e.message;
+      setItemStatus(item, 'error');
+    }
+  }
+
+  function startUploads(files) {
     if (!previewContainer) return;
+    uploadItems = [];
     previewContainer.innerHTML = '';
-    const files = imagesInput ? Array.from(imagesInput.files || []) : [];
     files.forEach((file) => {
       if (!file.type || !file.type.startsWith('image/')) return;
-      const url   = URL.createObjectURL(file);
-      const thumb = document.createElement('div');
-      thumb.className = 'preview-thumb';
-      const img = document.createElement('img');
-      img.src = url;
-      img.alt = file.name || '';
-      img.addEventListener('load', () => URL.revokeObjectURL(url));
-      thumb.appendChild(img);
-      previewContainer.appendChild(thumb);
+      const item = { file, status: 'uploading', url: null, error: null, el: null, promise: null };
+      buildThumb(item);
+      item.promise = uploadOne(item);
+      uploadItems.push(item);
     });
   }
 
   if (imagesInput) {
     imagesInput.addEventListener('change', () => {
-      const files = Array.from(imagesInput.files);
+      let files = Array.from(imagesInput.files || []);
       if (files.length > MAX_IMAGES) {
         Toast.info(`Puedes subir un máximo de ${MAX_IMAGES} fotos. Se usarán las primeras ${MAX_IMAGES}.`);
-        // Create a new FileList object with the first 10 files
+        files = files.slice(0, MAX_IMAGES);
         const dataTransfer = new DataTransfer();
-        for (let i = 0; i < MAX_IMAGES; i++) {
-          dataTransfer.items.add(files[i]);
-        }
+        files.forEach((f) => dataTransfer.items.add(f));
         imagesInput.files = dataTransfer.files;
       }
-      renderImagePreviews();
+      startUploads(files);
     });
+  }
+
+  // Wait for any in-flight uploads and return the successful URLs. Used at submit.
+  async function awaitUploadedPhotos() {
+    if (!uploadItems.length) return { urls: [], failed: 0 };
+    await Promise.allSettled(uploadItems.map((it) => it.promise));
+    const urls   = uploadItems.filter((it) => it.url).map((it) => it.url);
+    const failed = uploadItems.filter((it) => !it.url).length;
+    return { urls, failed };
   }
 
   // ─── Category-specific fields (clothing size / real-estate details) ──────────
   const categorySelect = document.getElementById('category');
+  const subcategoryGroup  = document.getElementById('subcategory-group');
+  const subcategorySelect = document.getElementById('subcategory');
   const sizeGroup      = document.getElementById('size-group');
   const sizeSelect     = document.getElementById('size');
   const realestateGroup = document.getElementById('realestate-group');
@@ -177,8 +283,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const jobFields = ['job_company', 'job_type', 'job_modality', 'job_salary', 'job_apply_email', 'job_apply_url']
     .map((id) => document.getElementById(id));
 
+  // Populate the category dropdown from the shared taxonomy (single source of
+  // truth). Keeps the disabled placeholder; appends one <option> per category.
+  function populateCategoryOptions() {
+    if (!categorySelect || typeof Taxonomy === 'undefined') return;
+    Taxonomy.CATEGORIES.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c.value;
+      opt.textContent = (c.icon ? c.icon + '  ' : '') + c.label;
+      categorySelect.appendChild(opt);
+    });
+  }
+
+  // Fill the subcategory dropdown for the chosen category and toggle its
+  // visibility. `selected` pre-selects a value (used in edit mode).
+  function populateSubcategories(catValue, selected) {
+    if (!subcategorySelect || typeof Taxonomy === 'undefined') return;
+    const subs = Taxonomy.subcategoriesFor(catValue);
+    subcategorySelect.innerHTML = '<option value="">Todas</option>';
+    subs.forEach((s) => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      if (selected && s === selected) opt.selected = true;
+      subcategorySelect.appendChild(opt);
+    });
+    const hasSubs = subs.length > 0;
+    if (subcategoryGroup) subcategoryGroup.classList.toggle('hidden', !hasSubs);
+    // When there's no subcategory column, let the category select take the full row
+    // width instead of leaving an empty half.
+    const categoryRow = document.getElementById('category-row');
+    if (categoryRow) categoryRow.classList.toggle('row-collapsed', !hasSubs);
+    if (!hasSubs) subcategorySelect.value = '';
+  }
+
+  populateCategoryOptions();
+
   function updateCategoryFields() {
     const value = categorySelect ? categorySelect.value : '';
+
+    // Refresh subcategories for the chosen category (no preselect on manual change).
+    populateSubcategories(value);
 
     const showSize = value === SIZE_CATEGORY;
     if (sizeGroup) sizeGroup.classList.toggle('hidden', !showSize);
@@ -200,6 +345,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // ─── Plan UI helpers ──────────────────────────────────────────────────────
+
+  // Option A downgrade banner: existing listings stay live; new ones are blocked
+  // while the account exceeds its current plan limit.
+  function showOverLimitBanner(data) {
+    const banner = document.getElementById('over-limit-banner');
+    if (!banner) return;
+    if (!data || !data.overLimit) { banner.classList.add('hidden'); return; }
+    const planLabel = { free: 'Gratis', basic: 'Basic', pro: 'Pro' }[data.plan] || data.plan;
+    banner.innerHTML =
+      '<strong>Tu cuenta supera el límite de tu plan.</strong> ' +
+      'Tenés ' + data.listingCount + ' anuncios activos y el plan ' + planLabel +
+      ' permite ' + data.maxListings + '. Tus anuncios actuales siguen publicados, pero para ' +
+      'crear uno nuevo mejorá tu plan o eliminá algunos. ' +
+      '<a href="/pricing">Mejorar plan</a> · <a href="/dashboard">Administrar mis anuncios</a>';
+    banner.classList.remove('hidden');
+  }
 
   function setPlanBar(plan) {
     const badge = document.getElementById('publish-plan-badge');
@@ -276,6 +437,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setVal('job_apply_email', jb.applyEmail || '');
     setVal('job_apply_url',   jb.applyUrl || '');
     updateCategoryFields();
+    // updateCategoryFields rebuilt the subcategory options; now select the stored one.
+    if (subcategorySelect) populateSubcategories(listing.category, listing.subcategory || '');
     submitButton.textContent = 'Guardar cambios';
     showForm();
     // Manually trigger input events to update counters
@@ -311,6 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const maxListings  = profileData.maxListings;
       const credits      = profileData.credits || 0;
       applyPlanUI(profile.plan, listingCount, remaining, maxListings, credits);
+      showOverLimitBanner(profileData);
     } else {
       // All retries failed — show safe defaults so the page is always usable
       applyPlanUI(user.email === OWNER_EMAIL ? 'pro' : 'free', 0, 3, 3, 0);
@@ -319,48 +483,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── Publish form submit ──────────────────────────────────────────────────
   if (form) {
-    const getUploadSignature = async () => {
-      const response = await authFetch('/api/listings/upload-signature', { method: 'POST' });
-      if (!response.ok) {
-        const raw = await response.text().catch(() => '');
-        throw new Error(raw || 'No se pudo preparar la subida de imágenes.');
-      }
-      return response.json();
-    };
-
-    const uploadImagesDirect = async (files) => {
-      if (!files || files.length === 0) return [];
-      setStatus('Subiendo imágenes...');
-
-      const sig = await getUploadSignature();
-      const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`;
-
-      const uploads = files.map(async (file) => {
-        const data = new FormData();
-        data.append('file', file);
-        data.append('api_key', sig.apiKey);
-        data.append('timestamp', sig.timestamp);
-        data.append('signature', sig.signature);
-        if (sig.folder) data.append('folder', sig.folder);
-        if (sig.transformation) data.append('transformation', sig.transformation);
-        if (sig.format) data.append('format', sig.format);
-
-        const response = await fetch(uploadUrl, { method: 'POST', body: data });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.secure_url) {
-          const msg = payload.error && payload.error.message
-            ? payload.error.message
-            : 'No se pudo subir una imagen.';
-          throw new Error(msg);
-        }
-        return payload.secure_url;
-      });
-
-      const urls = await Promise.all(uploads);
-      setStatus('');
-      return urls;
-    };
-
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!currentUser) {
@@ -410,13 +532,27 @@ document.addEventListener('DOMContentLoaded', () => {
       submitButton.textContent = 'Publicando...';
 
       const listingName = nameValue;
-      const imageFiles = imagesInput ? Array.from(imagesInput.files || []) : [];
 
+      // Photos were already compressed + uploaded in the background as they were
+      // chosen. Here we just wait for any still in flight and collect the URLs —
+      // usually instant.
       let uploadedPhotos = [];
+      const stillUploading = uploadItems.some((it) => it.status === 'uploading');
+      if (stillUploading) setStatus('Terminando de subir las imágenes...');
       try {
-        if (imageFiles.length > 0) {
-          uploadedPhotos = await uploadImagesDirect(imageFiles);
-        } else if (!isEditMode && !isJob) {
+        const { urls, failed } = await awaitUploadedPhotos();
+        uploadedPhotos = urls;
+        setStatus('');
+        if (failed > 0 && urls.length === 0 && !isEditMode && !isJob) {
+          Toast.error('No se pudieron subir las imágenes. Volvé a intentarlo.');
+          submitButton.disabled = false;
+          submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
+          return;
+        }
+        if (failed > 0 && urls.length > 0) {
+          Toast.info(`${failed} imagen(es) no se pudieron subir; se publicará con ${urls.length}.`);
+        }
+        if (uploadedPhotos.length === 0 && !isEditMode && !isJob) {
           Toast.error('Agregá al menos una foto de tu anuncio.');
           submitButton.disabled = false;
           submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
@@ -436,6 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
         description: descriptionValue,
         price: priceHidden.value,
         category: form.category.value,
+        subcategory: subcategorySelect ? subcategorySelect.value : '',
         condition: form.condition ? form.condition.value : '',
         size: sizeSelect ? sizeSelect.value : '',
         re_operation: document.getElementById('re_operation')?.value || '',
@@ -480,6 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Reset the form so "Publish another" starts fresh
             form.reset();
             if (previewContainer) previewContainer.innerHTML = '';
+            uploadItems = []; // clear staged uploads so the next listing starts fresh
           }
 
         } else if (response.status === 402) {

@@ -85,6 +85,10 @@ document.addEventListener('DOMContentLoaded', function () {
         ? '<span class="badge-featured">Destacado</span>'
         : '';
 
+      var sellerProBadge = product.sellerPro
+        ? ' <span class="badge-seller-pro" title="Vendedor Pro verificado">★ Vendedor Pro</span>'
+        : '';
+
       // Views counter
       var viewsHtml = product.views
         ? '<div class="product-views">👁 ' + Number(product.views).toLocaleString('es-CR') + ' visitas</div>'
@@ -173,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function () {
               : '') +
             '<div class="product-seller">' +
               '<h3>' + (isJob ? 'Publicado por' : 'Vendedor') + '</h3>' +
-              '<p>' + sellerName + '</p>' +
+              '<p>' + sellerName + sellerProBadge + '</p>' +
             '</div>' +
             (isJob ? applyHtml : waHtml) +
             '<button type="button" class="report-btn" id="report-btn" data-listing-id="' + escapeHtml(product._id) + '">' +
@@ -184,6 +188,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
       _initCarousel(photos, product.name);
       _initReportButton(product._id);
+
+      // Contact-intent analytics: count clicks on the WhatsApp / apply buttons.
+      // Fire-and-forget; never blocks navigation. Feeds the future Pro dashboard.
+      var contactBtns = container.querySelectorAll('.wa-btn-large, a.cta-button.secondary');
+      contactBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var url = API_BASE_URL + '/api/listings/' + encodeURIComponent(product._id) + '/click';
+          try { if (navigator.sendBeacon) { navigator.sendBeacon(url); return; } } catch (e) {}
+          fetch(url, { method: 'POST', keepalive: true }).catch(function () {});
+        });
+      });
     })
     .catch(function (err) {
       console.error('[product]', err);

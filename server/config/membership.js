@@ -128,4 +128,23 @@ function result(plan, extra = {}) {
   };
 }
 
-module.exports = { getEffectiveMembership, PERIOD_END_GRACE_MS };
+/**
+ * Denormalize a user's Pro status onto all their listings (powers Pro priority
+ * placement in the feed). Called whenever a plan changes. Best-effort and
+ * fire-and-forgettable — never let it break the calling flow. `require` is done
+ * inside to avoid a load-order cycle with the Listing model.
+ *
+ * @param {string} uid
+ * @param {boolean} isPro
+ */
+async function syncSellerProListings(uid, isPro) {
+  if (!uid) return;
+  try {
+    const Listing = require('../models/listing.model');
+    await Listing.updateMany({ author: uid }, { $set: { sellerPro: !!isPro } });
+  } catch (e) {
+    console.warn('[syncSellerProListings]', e.message);
+  }
+}
+
+module.exports = { getEffectiveMembership, PERIOD_END_GRACE_MS, syncSellerProListings };

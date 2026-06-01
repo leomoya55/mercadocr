@@ -79,6 +79,7 @@
             <nav class="admin-tabs" id="admin-tabs">
                 <button class="admin-tab active" data-tab="listings">Anuncios</button>
                 <button class="admin-tab" data-tab="users">Usuarios</button>
+                <button class="admin-tab" data-tab="boosts">Destacados</button>
                 <button class="admin-tab" data-tab="reports">Reportes</button>
             </nav>
 
@@ -128,6 +129,15 @@
             </section>
 
             <!-- Reports panel -->
+            <section class="admin-panel" id="tab-boosts">
+                <div class="admin-toolbar">
+                    <button id="admin-boosts-refresh" type="button">Actualizar</button>
+                </div>
+                <div id="admin-boosts-table" class="admin-table-wrap">
+                    <p class="admin-loading">Cargando...</p>
+                </div>
+            </section>
+
             <section class="admin-panel" id="tab-reports">
                 <div class="admin-toolbar">
                     <select id="admin-report-status">
@@ -161,6 +171,6 @@
     <script src="js/config.js?v=12"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=16"></script>
-    <script src="js/admin.js?v=13"></script>
+    <script src="js/admin.js?v=14"></script>
 </body>
 </html>

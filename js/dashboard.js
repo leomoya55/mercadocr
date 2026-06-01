@@ -40,6 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const renewBtn = isExpired
         ? `<button data-renew="${listing._id}" class="btn-renew">Renovar</button>`
         : '';
+      // Boost button on live listings — "Destacar" or "Extender" if already featured.
+      const boostBtn = isLive
+        ? `<button data-boost="${listing._id}" class="btn-boost">${listing.featured ? '⭐ Extender' : '⭐ Destacar'}</button>`
+        : '';
 
       // Sold listings auto-delete a week after being marked sold.
       let statusNote = '';
@@ -78,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${listing.provincia ? `<div class="listing-item-location">📍 ${escapeHtml(listing.provincia)}</div>` : ''}
           <div class="dashboard-actions">
             ${renewBtn}
+            ${boostBtn}
             ${editBtn}
             ${markSoldBtn}
             <button data-delete="${listing._id}">Eliminar</button>
@@ -148,6 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
+    container.querySelectorAll('[data-boost]').forEach(btn => {
+      btn.addEventListener('click', () => openBoostChooser(btn.getAttribute('data-boost')));
+    });
+
     container.querySelectorAll('[data-delete]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const ok = await Modal.confirm({
@@ -170,6 +179,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
+  }
+
+  // ─── Boost / featured purchase ─────────────────────────────────────────────
+  // Pricing mirrors server/config/featured.js (BOOST_PACKAGES). Keep in sync.
+  const BOOST_OPTIONS = [
+    { type: '24h', title: 'Destacado 24 horas', price: '₡500' },
+    { type: '7d',  title: 'Destacado 7 días',   price: '₡1.500' },
+  ];
+
+  function openBoostChooser(listingId) {
+    const cards = BOOST_OPTIONS.map(o =>
+      `<button type="button" class="boost-option" data-boost-type="${o.type}">
+         <span class="boost-option-title">${o.title}</span>
+         <span class="boost-option-price">${o.price}</span>
+       </button>`).join('');
+    Modal.show({
+      ariaLabel: 'Destacar anuncio',
+      html:
+        '<div class="modal-confirm-title">Destacá tu anuncio ⭐</div>' +
+        '<div class="modal-confirm-message">Tu anuncio aparecerá arriba del resto y de primero en las búsquedas durante el periodo elegido.</div>' +
+        '<div class="boost-options">' + cards + '</div>',
+    });
+    document.querySelectorAll('.boost-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.getAttribute('data-boost-type');
+        Modal.hide();
+        startBoostCheckout(listingId, type);
+      });
+    });
+  }
+
+  async function startBoostCheckout(listingId, boostType) {
+    const user = auth.currentUser;
+    if (!user) { window.location.href = '/login'; return; }
+    try {
+      Toast.info('Redirigiendo al pago...');
+      const r = await authFetch('/api/payment/create-checkout-session', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'boost', boostType, listingId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        Toast.error(data.message || data.error || 'No se pudo iniciar el pago del destacado.');
+      }
+    } catch {
+      Toast.error('No se pudo conectar con el servidor.');
+    }
   }
 
   // ─── Listings fetcher ─────────────────────────────────────────────────────
@@ -199,6 +257,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (remaining > 0)  return String(remaining);
     if (credits  > 0)   return `${credits} crédito${credits !== 1 ? 's' : ''}`;
     return '0';
+  }
+
+  // Option A downgrade banner — existing listings stay live; new ones blocked.
+  function showOverLimitBanner(data) {
+    if (!listingsContainer) return;
+    let banner = document.getElementById('over-limit-banner');
+    if (!data || !data.overLimit) { if (banner) banner.classList.add('hidden'); return; }
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'over-limit-banner';
+      banner.className = 'over-limit-banner';
+      banner.setAttribute('role', 'status');
+      listingsContainer.parentNode.insertBefore(banner, listingsContainer);
+    }
+    banner.classList.remove('hidden');
+    const planLabel = { free: 'Gratis', basic: 'Basic', pro: 'Pro' }[data.plan] || data.plan;
+    banner.innerHTML =
+      '<strong>Tu cuenta supera el límite de tu plan.</strong> ' +
+      'Tenés ' + data.listingCount + ' anuncios activos y el plan ' + planLabel +
+      ' permite ' + data.maxListings + '. Tus anuncios siguen publicados, pero no podrás crear ' +
+      'nuevos hasta mejorar tu plan o eliminar algunos. <a href="/pricing">Mejorar plan</a>';
   }
 
   function applyOwnerUI() {
@@ -253,6 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (metricCount) metricCount.textContent = listingCount;
 
+    showOverLimitBanner(profileData);
+
     const planLabels = { free: 'Gratis', basic: 'Basic', pro: 'Pro' };
     if (metricPlan) metricPlan.textContent = planLabels[profile.plan] || 'Gratis';
 
@@ -285,6 +366,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderListings(listings, listingsContainer);
   };
+
+  // Returning from a boost checkout — surface the result and refresh the cache so
+  // the new "Destacado" status shows after the webhook applies it.
+  const dashParams = new URLSearchParams(window.location.search);
+  if (dashParams.get('boost_success') === 'true') {
+    UserStore.invalidate();
+    Toast.success('¡Pago recibido! Tu anuncio se está destacando.');
+    window.history.replaceState({}, document.title, '/dashboard');
+  } else if (dashParams.get('boost_canceled') === 'true') {
+    Toast.info('Pago cancelado. Tu anuncio no fue destacado.');
+    window.history.replaceState({}, document.title, '/dashboard');
+  }
 
   auth.onAuthStateChanged((user) => {
     if (!user) { window.location.href = '/login'; return; }

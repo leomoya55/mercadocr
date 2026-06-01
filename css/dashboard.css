@@ -48,6 +48,7 @@
     display: flex;
     gap: 0.5rem;
     margin-top: 0.8rem;
+    flex-wrap: wrap; /* action buttons wrap on narrow cards instead of overflowing */
 }
 
 .dashboard-actions button {
@@ -99,3 +100,38 @@
 }
 .btn-renew:hover { background: #f5dfa0; }
 .btn-renew:disabled { background: #555; color: #aaa; cursor: not-allowed; }
+
+/* ─── Boost ("Destacar") button + chooser modal ──────────────────────────── */
+.btn-boost {
+    background: linear-gradient(135deg, #e8c97a, #d4b052);
+    color: #0d0d0d !important;
+    border: none !important;
+    font-weight: 700;
+}
+.btn-boost:hover { filter: brightness(1.08); }
+
+.boost-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+
+.boost-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid #3a3a3a;
+    border-radius: 10px;
+    background: #161616;
+    color: #fff;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    transition: border-color 0.15s, background 0.15s;
+}
+.boost-option:hover { border-color: #e8c97a; background: #1f1c12; }
+.boost-option-title { font-weight: 600; }
+.boost-option-price { color: #e8c97a; font-weight: 700; }

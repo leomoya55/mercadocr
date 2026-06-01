@@ -46,20 +46,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ─── Current query state ──────────────────────────────────────────────────
   var currentParams = {
-    q:         '',
-    category:  '',
-    condition: '',
-    provincia: '',
-    minPrice:  '',
-    maxPrice:  '',
-    sort:      'newest',
-    page:      1,
+    q:           '',
+    category:    '',
+    subcategory: '',
+    condition:   '',
+    provincia:   '',
+    minPrice:    '',
+    maxPrice:    '',
+    sort:        'newest',
+    page:        1,
   };
 
   // ─── Delegated event handling ─────────────────────────────────────────────
   // Single listener handles card navigation; WA <a> tags are native links.
+  // Fire-and-forget contact-intent analytics (seller analytics / Pro dashboards).
+  function trackClick(id) {
+    if (!id) return;
+    var url = API_BASE_URL + '/api/listings/' + encodeURIComponent(id) + '/click';
+    try {
+      if (navigator.sendBeacon) { navigator.sendBeacon(url); return; }
+    } catch (e) { /* fall through */ }
+    fetch(url, { method: 'POST', keepalive: true }).catch(function () {});
+  }
+
   listingsContainer.addEventListener('click', function (e) {
-    if (e.target.closest('.listing-wa-btn')) return; // let native <a> handle
+    if (e.target.closest('.listing-wa-btn')) {
+      var waCard = e.target.closest('.listing-item[data-id]');
+      if (waCard) trackClick(waCard.dataset.id); // count the contact, then let the link open
+      return; // let native <a> handle
+    }
     var card = e.target.closest('.listing-item[data-id]');
     if (card) window.location.href = '/product?id=' + card.dataset.id;
   });
@@ -83,6 +98,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var featuredBadge = listing.featured
       ? '<span class="badge-featured">Destacado</span>'
+      : '';
+
+    var proBadge = listing.sellerPro
+      ? '<span class="badge-seller-pro" title="Vendedor Pro verificado">★ Vendedor Pro</span>'
       : '';
 
     var conditionBadge = listing.condition && CONDITION_LABELS[listing.condition]
@@ -119,9 +138,12 @@ document.addEventListener('DOMContentLoaded', function () {
       imgHtml +
       '<div class="listing-item-content">' +
         '<div class="listing-item-title">' + escapeHtml(listing.name) + '</div>' +
+        (listing.subcategory
+          ? '<div class="listing-item-subcat">' + escapeHtml(listing.subcategory) + '</div>'
+          : '') +
         '<div class="listing-item-meta">' +
           priceHtml +
-          '<div class="listing-item-badges">' + conditionBadge + featuredBadge + waBtn + '</div>' +
+          '<div class="listing-item-badges">' + conditionBadge + proBadge + featuredBadge + waBtn + '</div>' +
         '</div>' +
         (listing.provincia
           ? '<div class="listing-item-location">📍 ' + escapeHtml(listing.provincia) + '</div>'
@@ -196,9 +218,10 @@ document.addEventListener('DOMContentLoaded', function () {
   // ─── Fetch ────────────────────────────────────────────────────────────────
   function buildQueryString(params) {
     var parts = [];
-    if (params.q)         parts.push('q='         + encodeURIComponent(params.q));
-    if (params.category)  parts.push('category='  + encodeURIComponent(params.category));
-    if (params.condition) parts.push('condition='  + encodeURIComponent(params.condition));
+    if (params.q)           parts.push('q='           + encodeURIComponent(params.q));
+    if (params.category)    parts.push('category='    + encodeURIComponent(params.category));
+    if (params.subcategory) parts.push('subcategory=' + encodeURIComponent(params.subcategory));
+    if (params.condition)   parts.push('condition='   + encodeURIComponent(params.condition));
     if (params.provincia) parts.push('provincia=' + encodeURIComponent(params.provincia));
     if (params.minPrice)  parts.push('minPrice='  + encodeURIComponent(params.minPrice));
     if (params.maxPrice)  parts.push('maxPrice='  + encodeURIComponent(params.maxPrice));
@@ -248,17 +271,109 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
-  // ─── Filter controls ──────────────────────────────────────────────────────
+  // ─── Category sidebar (taxonomy-driven) ───────────────────────────────────
+  // Built from the shared taxonomy so it never drifts from the publish form or
+  // the server. Empleos is excluded — it has its own page and is kept out of the
+  // general products feed. The active category's subcategories expand inline.
+  var categoryNav = document.getElementById('category-nav');
+  var pageHeading = document.querySelector('.listings-page h2');
 
-  // Sidebar category links
-  document.querySelectorAll('.category-link').forEach(function (link) {
-    link.addEventListener('click', function (e) {
-      e.preventDefault();
-      currentParams.category = e.currentTarget.dataset.category || '';
-      currentParams.page     = 1;
-      fetchAndRender();
+  function renderSidebar() {
+    if (!categoryNav || typeof Taxonomy === 'undefined') return;
+    categoryNav.innerHTML = '';
+    var frag = document.createDocumentFragment();
+
+    // "Todas" reset entry first.
+    frag.appendChild(makeCatButton('', 'Todas', '', !currentParams.category));
+
+    // Each category as a row; the ACTIVE category's subcategories are inserted
+    // directly beneath it (accordion), so they read as nested children — on both
+    // desktop (indented column) and mobile (full-width strip under the chip).
+    Taxonomy.CATEGORIES.forEach(function (c) {
+      if (c.value === 'Empleos') return; // own page
+      var isActive = currentParams.category === c.value;
+      frag.appendChild(makeCatButton(c.value, c.label, c.icon, isActive));
+
+      var subs = Taxonomy.subcategoriesFor(c.value);
+      if (isActive && subs.length) {
+        var subRow = document.createElement('div');
+        subRow.className = 'subcat-row';
+        subs.forEach(function (s) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'subcat-item' + (currentParams.subcategory === s ? ' is-active' : '');
+          btn.textContent = s;
+          btn.dataset.category = c.value;
+          btn.dataset.subcategory = s;
+          subRow.appendChild(btn);
+        });
+        frag.appendChild(subRow);
+      }
     });
-  });
+
+    categoryNav.appendChild(frag);
+  }
+
+  function makeCatButton(value, label, icon, active) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cat-item' + (active ? ' is-active' : '');
+    btn.dataset.category = value;
+    btn.textContent = (icon ? icon + '  ' : '') + label;
+    if (active) btn.setAttribute('aria-current', 'true');
+    return btn;
+  }
+
+  // Reflect the current filters in the URL so category/subcategory views are
+  // shareable and survive a refresh, without a full navigation.
+  function syncUrl() {
+    if (document.body.getAttribute('data-fixed-category')) return; // locked pages keep their URL
+    var qs = [];
+    if (currentParams.category)    qs.push('category='    + encodeURIComponent(currentParams.category));
+    if (currentParams.subcategory) qs.push('subcategory=' + encodeURIComponent(currentParams.subcategory));
+    if (currentParams.q)           qs.push('q='           + encodeURIComponent(currentParams.q));
+    var url = '/listings' + (qs.length ? '?' + qs.join('&') : '');
+    window.history.replaceState({}, '', url);
+  }
+
+  function updateHeading() {
+    if (!pageHeading) return;
+    if (document.body.getAttribute('data-fixed-category')) return; // keep the page's own heading
+
+    if (currentParams.subcategory) pageHeading.textContent = currentParams.subcategory;
+    else if (currentParams.category) pageHeading.textContent = currentParams.category;
+    else pageHeading.textContent = 'Todos los anuncios';
+  }
+
+  // One delegated handler for the whole sidebar (categories + subcategories).
+  if (categoryNav) {
+    categoryNav.addEventListener('click', function (e) {
+      var sub = e.target.closest('.subcat-item');
+      if (sub) {
+        var subVal = sub.dataset.subcategory || '';
+        // Toggle off if clicking the already-active subcategory.
+        currentParams.subcategory = (currentParams.subcategory === subVal) ? '' : subVal;
+        currentParams.category    = sub.dataset.category || '';
+        currentParams.page        = 1;
+        applyCategoryChange();
+        return;
+      }
+      var cat = e.target.closest('.cat-item');
+      if (cat) {
+        currentParams.category    = cat.dataset.category || '';
+        currentParams.subcategory = ''; // changing category clears subcategory
+        currentParams.page        = 1;
+        applyCategoryChange();
+      }
+    });
+  }
+
+  function applyCategoryChange() {
+    renderSidebar();
+    updateHeading();
+    syncUrl();
+    fetchAndRender();
+  }
 
   // Search bar — submit on button click or Enter key
   var searchInput = document.getElementById('search-q');
@@ -305,7 +420,10 @@ document.addEventListener('DOMContentLoaded', function () {
       var mn   = document.getElementById('min-price');       if (mn)   mn.value   = '';
       var mx   = document.getElementById('max-price');       if (mx)   mx.value   = '';
       var srt  = document.getElementById('filter-sort');     if (srt)  srt.value  = 'newest';
-      currentParams = { q:'', category: fixedCategory, condition:'', provincia:'', minPrice:'', maxPrice:'', sort:'newest', page:1 };
+      currentParams = { q:'', category: fixedCategory, subcategory:'', condition:'', provincia:'', minPrice:'', maxPrice:'', sort:'newest', page:1 };
+      renderSidebar();
+      updateHeading();
+      syncUrl();
       fetchAndRender();
     });
   }
@@ -316,11 +434,19 @@ document.addEventListener('DOMContentLoaded', function () {
     currentParams.category = fixedCategory; // locked page (e.g. Empleos)
   } else if (urlParams.get('category')) {
     currentParams.category = urlParams.get('category');
+    // Only accept a subcategory that genuinely belongs to the chosen category.
+    var sub = urlParams.get('subcategory') || '';
+    if (sub && typeof Taxonomy !== 'undefined' &&
+        Taxonomy.isValidSubcategory(currentParams.category, sub)) {
+      currentParams.subcategory = sub;
+    }
   }
   if (urlParams.get('q')) {
     currentParams.q = urlParams.get('q');
     if (searchInput) searchInput.value = currentParams.q;
   }
 
+  renderSidebar();
+  updateHeading();
   fetchAndRender();
 });

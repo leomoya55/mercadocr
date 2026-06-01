@@ -61,6 +61,7 @@
       switchToTab(btn.dataset.tab);
       if (btn.dataset.tab === 'users'   && !btn.dataset.loaded) { loadUsers(1); }
       if (btn.dataset.tab === 'reports' && !btn.dataset.loaded) { loadReports(1); }
+      if (btn.dataset.tab === 'boosts') { loadBoosts(); } // light list — refresh each open
       btn.dataset.loaded = '1';
     });
   });
@@ -278,6 +279,62 @@
       }
     });
   }
+
+  // ─── Boosts (active featured listings) ──────────────────────────────────────
+  function loadBoosts() {
+    var wrap = document.getElementById('admin-boosts-table');
+    if (wrap) wrap.innerHTML = '<p class="admin-loading">Cargando...</p>';
+    authFetch(API_BASE_URL + '/api/admin/boosts')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderBoostsTable(d.boosts || [], d.now); })
+      .catch(function (err) {
+        console.error('[admin boosts]', err);
+        if (wrap) wrap.innerHTML = '<p class="admin-loading">Error al cargar.</p>';
+      });
+  }
+
+  function fmtBoostRemaining(until, now) {
+    if (!until) return 'Editorial (sin vencimiento)';
+    var ms = new Date(until).getTime() - new Date(now || Date.now()).getTime();
+    if (ms <= 0) return 'Expirado';
+    var hours = Math.floor(ms / 3600000);
+    if (hours >= 24) return Math.floor(hours / 24) + ' día(s)';
+    if (hours >= 1)  return hours + ' h';
+    return Math.max(1, Math.floor(ms / 60000)) + ' min';
+  }
+
+  function renderBoostsTable(boosts, now) {
+    var wrap = document.getElementById('admin-boosts-table');
+    if (!wrap) return;
+    if (!boosts.length) {
+      wrap.innerHTML = '<p class="admin-loading">No hay destacados activos.</p>';
+      return;
+    }
+    var rows = boosts.map(function (b) {
+      var type = b.boostType ? b.boostType : (b.featuredUntil ? '—' : 'editorial');
+      return '<tr>' +
+        '<td>' + escapeHtml(b.name || '') + '</td>' +
+        '<td>' + escapeHtml(b.category || '') + '</td>' +
+        '<td>' + escapeHtml(type) + '</td>' +
+        '<td>' + escapeHtml(fmtBoostRemaining(b.featuredUntil, now)) + '</td>' +
+        '<td><button class="btn-sm" data-boost-remove="' + escapeHtml(String(b._id)) + '">Quitar</button></td>' +
+        '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table class="admin-table"><thead><tr>' +
+      '<th>Anuncio</th><th>Categoría</th><th>Tipo</th><th>Restante</th><th></th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+    wireOnce(wrap, 'click', function (e) {
+      var btn = e.target.closest('[data-boost-remove]');
+      if (!btn) return;
+      adminPost('/api/admin/listings/' + btn.dataset.boostRemove + '/feature',
+        { featured: false },
+        function () { Toast.success('Destacado eliminado.'); loadBoosts(); });
+    });
+  }
+
+  var boostsRefreshBtn = document.getElementById('admin-boosts-refresh');
+  if (boostsRefreshBtn) boostsRefreshBtn.addEventListener('click', loadBoosts);
 
   // ─── Users ────────────────────────────────────────────────────────────────
   var usersPage = 1;

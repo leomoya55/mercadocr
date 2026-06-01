@@ -8,15 +8,15 @@ const { ensureUser }           = require('../middleware/ensureUser');
 const ensureVerified         = require('../middleware/ensureVerified');
 const { enforceListingLimit, getActiveCount, refundCreditIfUsed } = require('../middleware/listingLimits');
 const { isOwner }              = require('../config/plans');
-const { canFeatureListing }    = require('../config/featured');
-const { createListingLimiter } = require('../middleware/rateLimiters');
+const { getEffectiveMembership } = require('../config/membership');
+const { canFeatureListing, expireBoosts } = require('../config/featured');
+const { createListingLimiter, clickLimiter } = require('../middleware/rateLimiters');
+const Taxonomy                 = require('../../js/categories');
 
 // ─── Server-side listing validation (never trust the client) ─────────────────
-// Must match the <option value="…"> values in publish.html exactly.
-const VALID_CATEGORIES = new Set([
-  'Ropa y accesorios', 'Electrónica', 'Hogar y muebles',
-  'Vehículos', 'Bienes Raíces', 'Empleos', 'Servicios', 'Otros',
-]);
+// Categories come from the shared taxonomy (js/categories.js) so the server and
+// the publish form can never disagree about what's valid.
+const VALID_CATEGORIES = new Set(Taxonomy.categoryValues());
 const VALID_CONDITIONS = new Set(['new', 'like_new', 'good', 'fair', 'regular', '']);
 
 // Job (Empleos) option whitelists — must match the <option> values in publish.html.
@@ -112,6 +112,10 @@ function validateListingInput(body) {
   const category = String(body.category || '').trim();
   const isJob = category === JOB_CATEGORY;
   const condition = body.condition === undefined ? '' : String(body.condition).trim();
+  // Subcategory is optional; normalized against the taxonomy for this category.
+  // An invalid or mismatched subcategory is silently dropped to '' (never errors,
+  // so a stale client can't block a publish over a second-level field).
+  const subcategory = Taxonomy.normalizeSubcategory(category, String(body.subcategory || '').trim().slice(0, 60));
   // Size only applies to the clothing category; ignored (stored as '') otherwise.
   const size = category === 'Ropa y accesorios'
     ? String(body.size || '').trim().slice(0, 30)
@@ -148,7 +152,7 @@ function validateListingInput(body) {
     errors.push('Este anuncio parece contener artículos no permitidos (drogas, alcohol, tabaco, armas o servicios sexuales). No podemos publicarlo.');
   }
 
-  return { errors, clean: { name, description, price: priceNum, category, condition, size, realEstate, job } };
+  return { errors, clean: { name, description, price: priceNum, category, subcategory, condition, size, realEstate, job } };
 }
 
 // ─── Public ──────────────────────────────────────────────────────────────────
@@ -169,10 +173,23 @@ function validateListingInput(body) {
  *
  * Response: { listings: [...], pagination: { page, limit, total, pages } }
  */
+// Self-healing boost expiry: clear lapsed timed boosts before serving the feed so
+// a 24h boost drops off on time regardless of cron cadence. Throttled to at most
+// once per minute per warm instance so it's not a write on every single request.
+let _lastBoostSweep = 0;
+async function sweepExpiredBoosts() {
+  const now = Date.now();
+  if (now - _lastBoostSweep < 60 * 1000) return;
+  _lastBoostSweep = now;
+  try { await expireBoosts(); } catch (e) { console.warn('[feed] boost sweep failed:', e.message); }
+}
+
 router.get('/', async (req, res) => {
   try {
+    await sweepExpiredBoosts();
+
     const {
-      q, category, condition, provincia,
+      q, category, subcategory, condition, provincia,
       minPrice, maxPrice, sort,
     } = req.query;
 
@@ -190,6 +207,11 @@ router.get('/', async (req, res) => {
     // products feed unless the category is explicitly requested.
     if (category)  filter.category  = category;
     else           filter.category  = { $ne: JOB_CATEGORY };
+    // Subcategory only narrows within a chosen category, and only if it's a real
+    // subcategory of it — guards against arbitrary client input hitting the index.
+    if (category && subcategory && Taxonomy.isValidSubcategory(category, subcategory)) {
+      filter.subcategory = subcategory;
+    }
     if (condition) filter.condition  = condition;
     if (provincia) filter.provincia  = provincia;
 
@@ -204,15 +226,16 @@ router.get('/', async (req, res) => {
     // Sort options
     let sortObj;
     if (q && q.trim() && !sort) {
-      // Text search: sort by relevance score when no explicit sort requested
-      sortObj = { score: { $meta: 'textScore' }, featured: -1 };
+      // Text search ranking: boosted first, then Pro sellers, then relevance.
+      sortObj = { featured: -1, sellerPro: -1, score: { $meta: 'textScore' } };
     } else {
       switch (sort) {
         case 'oldest':     sortObj = { createdAt:  1 }; break;
         case 'price_asc':  sortObj = { price:       1 }; break;
         case 'price_desc': sortObj = { price:      -1 }; break;
-        case 'featured':   sortObj = { featured: -1, createdAt: -1 }; break;
-        default:           sortObj = { featured: -1, createdAt: -1 }; // 'newest'
+        // Boosted first, then Pro sellers (priority placement), then newest.
+        case 'featured':   sortObj = { featured: -1, sellerPro: -1, createdAt: -1 }; break;
+        default:           sortObj = { featured: -1, sellerPro: -1, createdAt: -1 }; // 'newest'
       }
     }
 
@@ -230,19 +253,20 @@ router.get('/', async (req, res) => {
       Listing.countDocuments(filter),
     ]);
 
-    // ── Fill in missing contact/provincia from the seller's current profile ───
-    // Old listings may have contact='' or contact=email (pre-fix fallback).
-    // We validate contact as a phone number (≥8 digits after stripping non-digits).
+    // ── Enrich each listing from the seller's current profile ─────────────────
     // One batch User lookup covers all authors on this page — no N+1 queries.
+    // We do two things here:
+    //   1. Back-fill missing contact/provincia (old listings may lack them).
+    //   2. Attach a LIVE `sellerPro` flag for the Featured-Seller badge, derived
+    //      from the membership resolver so it's accurate even if the denormalized
+    //      listing.sellerPro (used for sorting) drifted between plan-change syncs.
     const isPhone = str => String(str || '').replace(/\D/g, '').length >= 8;
 
-    const needsSync = listings.some(l => !l.provincia || !isPhone(l.contact));
-
-    if (needsSync) {
-      const authorUids = [...new Set(listings.map(l => l.author))];
+    const authorUids = [...new Set(listings.map(l => l.author))];
+    if (authorUids.length) {
       const sellers = await User
         .find({ firebaseUid: { $in: authorUids } })
-        .select('firebaseUid phone provincia')
+        .select('firebaseUid phone provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email')
         .lean();
       const sellerMap = {};
       sellers.forEach(s => { sellerMap[s.firebaseUid] = s; });
@@ -250,11 +274,12 @@ router.get('/', async (req, res) => {
       listings = listings.map(l => {
         const s = sellerMap[l.author];
         if (!s) return l;
+        const eff = getEffectiveMembership(s);
         return {
           ...l,
-          // Use stored contact only if it's a real phone; fall back to current profile phone
           contact:   isPhone(l.contact) ? l.contact : (s.phone || ''),
           provincia: l.provincia || s.provincia || '',
+          sellerPro: eff.plan === 'pro', // live, authoritative for the badge
         };
       });
     }
@@ -330,6 +355,62 @@ router.post('/:id/view', verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /:id/click — contact-intent analytics.
+ *
+ * Fired when a buyer clicks a contact action (WhatsApp / email / apply link).
+ * Increments `clicks` and `leads` (currently the same event; `leads` is kept as a
+ * separate counter so its definition can tighten later without a migration).
+ * Anonymous + best-effort: it never blocks the contact action and never errors
+ * the page. This is the data source for the future Pro seller-analytics dashboard.
+ */
+router.post('/:id/click', clickLimiter, async (req, res) => {
+  try {
+    await Listing.updateOne(
+      { _id: req.params.id, hidden: { $ne: true } },
+      { $inc: { clicks: 1, leads: 1 } }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false }); // analytics must never break the contact flow
+  }
+});
+
+/**
+ * POST /:id/favorite — save/unsave a listing (toggle). Authenticated.
+ *
+ * Maintains `favoritedBy` (unique UIDs) and the denormalized `favorites` count.
+ * This is the analytics + persistence backbone for a future "saved listings"
+ * feature; the heart UI can be layered on later without schema changes.
+ *
+ * Returns { favorited: boolean, favorites: number }.
+ */
+router.post('/:id/favorite', verifyToken, async (req, res) => {
+  try {
+    const uid = req.uid;
+    const listing = await Listing.findById(req.params.id).select('favoritedBy').lean();
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+    const already = (listing.favoritedBy || []).includes(uid);
+    const update = already
+      ? { $pull: { favoritedBy: uid }, $inc: { favorites: -1 } }
+      : { $addToSet: { favoritedBy: uid }, $inc: { favorites: 1 } };
+
+    const updated = await Listing.findByIdAndUpdate(req.params.id, update, { new: true })
+      .select('favorites').lean();
+    // Guard the counter against drift (never negative).
+    let favorites = updated ? updated.favorites : 0;
+    if (favorites < 0) {
+      await Listing.updateOne({ _id: req.params.id }, { $set: { favorites: 0 } });
+      favorites = 0;
+    }
+    res.json({ favorited: !already, favorites });
+  } catch (err) {
+    console.error('[POST /:id/favorite]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /:id — single listing with seller info (does NOT increment views)
 router.get('/:id', async (req, res) => {
   try {
@@ -343,8 +424,16 @@ router.get('/:id', async (req, res) => {
     }
 
     const seller = await User.findOne({ firebaseUid: listing.author })
-      .select('nombre apellido phone provincia -_id').lean();
-    res.json({ ...listing, seller: seller || null });
+      .select('nombre apellido phone provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email').lean();
+    // Live Featured-Seller flag for the product page badge.
+    const sellerPro = seller ? getEffectiveMembership(seller).plan === 'pro' : false;
+    // Don't leak the seller's billing internals to the client — expose only
+    // public profile fields plus the derived Pro flag.
+    const publicSeller = seller ? {
+      nombre: seller.nombre, apellido: seller.apellido,
+      phone: seller.phone, provincia: seller.provincia,
+    } : null;
+    res.json({ ...listing, seller: publicSeller, sellerPro });
   } catch (err) {
     console.error('[GET /listings/:id]', err);
     res.status(400).json('Error: ' + err);
@@ -452,10 +541,13 @@ router.post('/add',
       // featured is a manual/earned distinction — never auto-set on creation
       const newListing = new Listing({
         name: clean.name, description: clean.description, price: clean.price,
-        category: clean.category, condition: clean.condition, size: clean.size,
+        category: clean.category, subcategory: clean.subcategory,
+        condition: clean.condition, size: clean.size,
         realEstate: clean.realEstate, job: clean.job,
         photos, contact, provincia,
         author: uid, featured: false,
+        // Pro priority placement (req.effPlan set by enforceListingLimit).
+        sellerPro: req.effPlan === 'pro',
       });
       await newListing.save();
 
@@ -522,6 +614,7 @@ router.post('/update/:id',
       listing.description  = clean.description;
       listing.price        = clean.price;
       listing.category     = clean.category;
+      listing.subcategory  = clean.subcategory;
       listing.condition    = clean.condition;
       listing.size         = clean.size;
       listing.realEstate   = clean.realEstate;

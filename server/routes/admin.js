@@ -145,17 +145,44 @@ router.post('/listings/:id/unhide', async (req, res) => {
 
 /**
  * POST /api/admin/listings/:id/feature   body: { featured: true|false }
+ *
+ * featured:true  → editorial feature that never auto-expires (featuredUntil:null).
+ * featured:false → also clears any paid-boost fields, so this doubles as the
+ *                  "manually remove a boost" control the admin needs.
  */
 router.post('/listings/:id/feature', async (req, res) => {
   try {
     const featured = req.body.featured !== false; // default true
+    const update = featured
+      ? { featured: true, featuredUntil: null } // editorial: no expiry
+      : { featured: false, featuredUntil: null, boostType: '', boostPurchaseDate: null }; // remove boost
     const listing  = await Listing.findByIdAndUpdate(
-      req.params.id, { featured }, { new: true }
+      req.params.id, { $set: update }, { new: true }
     );
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
-    audit(req, 'listing.feature', 'listing', req.params.id, { featured });
+    audit(req, featured ? 'listing.feature' : 'listing.unfeature', 'listing', req.params.id, { featured });
     res.json({ success: true, featured: listing.featured });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/boosts
+ * Lists currently-featured listings (paid boosts + editorial features) so the
+ * admin can see active promotions and remove them if needed. Timed boosts show
+ * their type and expiry; editorial features have featuredUntil:null.
+ */
+router.get('/boosts', async (req, res) => {
+  try {
+    const boosts = await Listing.find({ featured: true })
+      .sort({ featuredUntil: 1, updatedAt: -1 })
+      .select('name author boostType featuredUntil boostPurchaseDate price category status hidden')
+      .limit(500)
+      .lean();
+    res.json({ boosts, now: new Date() });
+  } catch (err) {
+    console.error('[GET /admin/boosts]', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -245,6 +272,9 @@ router.post('/users/:uid/plan', async (req, res) => {
       { $set: set },
       { new: true }
     );
+    // Keep the Pro-priority denormalization on the user's listings in sync.
+    const { syncSellerProListings } = require('../config/membership');
+    await syncSellerProListings(req.params.uid, plan === 'pro');
     audit(req, 'user.plan.set', 'user', req.params.uid, { from: before.plan, to: plan });
     res.json({ success: true, plan: user.plan });
   } catch (err) {

@@ -48,4 +48,17 @@ const writeLimiter = rateLimit({
   message: { error: 'Demasiadas solicitudes. Intenta de nuevo en unos minutos.', code: 'RATE_LIMITED' },
 });
 
-module.exports = { createListingLimiter, reportLimiter, writeLimiter };
+// Contact-intent analytics (POST /listings/:id/click) is unauthenticated, so it
+// keys by IP. Generous enough for real browsing, tight enough to blunt scripted
+// inflation of a listing's click/lead counts. On a 429 we silently no-op the
+// counter (the route ignores the limiter's body); analytics must never error UX.
+const clickLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyByUidOrIp,
+  message: { ok: false, code: 'RATE_LIMITED' },
+});
+
+module.exports = { createListingLimiter, reportLimiter, writeLimiter, clickLimiter };

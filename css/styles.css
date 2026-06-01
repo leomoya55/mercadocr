@@ -273,6 +273,19 @@ footer {
     letter-spacing: 0.03em;
 }
 
+/* Featured Seller badge — a Pro membership perk. */
+.badge-seller-pro {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    background: linear-gradient(135deg, #e8c97a, #cfa94e);
+    color: #0d0d0d;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
 .badge-sold {
     display: inline-block;
     padding: 0.2rem 0.6rem;
@@ -409,3 +422,27 @@ footer {
         font-size: 2.4rem;
     }
 }
+
+/* ─── Over-limit / downgrade banner (Option A) ───────────────────────────────
+   Shown on /publish and /dashboard when an account has more active listings
+   than its current plan allows (e.g. after a Pro→Basic/Free downgrade). Existing
+   listings stay live; new ones are blocked. Informative, not alarming. */
+.over-limit-banner {
+    margin: 0.75rem 0 1rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid #6b5a2a;
+    border-left: 4px solid #e8c97a;
+    border-radius: 8px;
+    background: #221d10;
+    color: #e7dcc2;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.over-limit-banner.hidden { display: none; }
+.over-limit-banner a {
+    color: #e8c97a;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.over-limit-banner a:hover { text-decoration: underline; }

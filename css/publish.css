@@ -100,6 +100,20 @@
     grid-template-columns: 1fr 1fr 1fr;
 }
 
+/* A row whose second field is hidden (e.g. category with no subcategory) drops
+   to a single full-width column instead of leaving an empty half. */
+.form-row.row-collapsed {
+    grid-template-columns: 1fr;
+}
+
+/* Subtle "(opcional)" qualifier on field labels */
+.field-optional {
+    color: #888;
+    font-weight: 400;
+    font-size: 0.85em;
+}
+/* .over-limit-banner lives in styles.css (global) so the dashboard can use it too. */
+
 #publish-form label {
     font-weight: bold;
 }
@@ -234,6 +248,48 @@
     object-fit: cover;
     display: block;
 }
+
+/* ─── Per-image upload status (compress + background upload feedback) ───────── */
+/* Dim the image while it uploads; clear once done. */
+.preview-thumb.is-uploading img { opacity: 0.5; }
+.preview-thumb.is-error img     { opacity: 0.4; }
+
+/* Spinner shown only while uploading */
+.preview-thumb .thumb-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 22px;
+    height: 22px;
+    margin: -11px 0 0 -11px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #e8c97a;
+    border-radius: 50%;
+    animation: thumb-spin 0.7s linear infinite;
+    display: none;
+}
+.preview-thumb.is-uploading .thumb-spinner { display: block; }
+
+@keyframes thumb-spin { to { transform: rotate(360deg); } }
+
+/* Status badge (✓ done / ⚠ error) in the corner */
+.preview-thumb .thumb-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 9px;
+    color: #0d0d0d;
+    font-weight: 700;
+    display: none;
+}
+.preview-thumb.is-done  .thumb-badge { display: block; background: #2ecc71; }
+.preview-thumb.is-error .thumb-badge { display: block; background: #e8c97a; color: #0d0d0d; }
 
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {

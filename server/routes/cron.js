@@ -22,6 +22,8 @@ const Listing = require('../models/listing.model');
 const ProcessedEvent = require('../models/processedEvent.model');
 const { stripe, tierFromSubscription, getPeriodEnd, ACTIVE_STATUSES } = require('../config/stripe');
 const { cloudinary, configureCloudinary, getPublicIdFromUrl } = require('../config/cloudinary');
+const { expireBoosts } = require('../config/featured');
+const { syncSellerProListings } = require('../config/membership');
 const { captureException } = require('../config/sentry');
 
 // ─── Auth guard for every cron route ──────────────────────────────────────────
@@ -72,6 +74,7 @@ router.get('/downgrade-expired', async (req, res) => {
         await User.updateOne({ firebaseUid: u.firebaseUid }, {
           $set: { plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null, planExpiresAt: null, cancelAtPeriodEnd: false },
         });
+        await syncSellerProListings(u.firebaseUid, false);
         downgraded++;
         continue;
       }
@@ -84,20 +87,23 @@ router.get('/downgrade-expired', async (req, res) => {
 
       if (stillActive) {
         // Webhook was missed but the sub is genuinely active → refresh, keep tier.
+        const refreshedTier = tierFromSubscription(sub) || u.plan;
         await User.updateOne({ firebaseUid: u.firebaseUid }, {
           $set: {
-            plan: tierFromSubscription(sub) || u.plan,
+            plan: refreshedTier,
             subscriptionStatus: sub.status,
             currentPeriodEnd: periodEnd,
             planExpiresAt: periodEnd,
             cancelAtPeriodEnd: !!sub.cancel_at_period_end,
           },
         });
+        await syncSellerProListings(u.firebaseUid, refreshedTier === 'pro');
         refreshed++;
       } else {
         await User.updateOne({ firebaseUid: u.firebaseUid }, {
           $set: { plan: 'free', subscriptionStatus: sub.status, currentPeriodEnd: null, planExpiresAt: null, cancelAtPeriodEnd: false, stripeSubscriptionId: null },
         });
+        await syncSellerProListings(u.firebaseUid, false);
         downgraded++;
       }
     } catch (err) {
@@ -106,6 +112,7 @@ router.get('/downgrade-expired', async (req, res) => {
         await User.updateOne({ firebaseUid: u.firebaseUid }, {
           $set: { plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null, planExpiresAt: null, cancelAtPeriodEnd: false, stripeSubscriptionId: null },
         });
+        await syncSellerProListings(u.firebaseUid, false);
         downgraded++;
       } else {
         console.error('[cron] reconcile failed for', u.firebaseUid, err.message);
@@ -177,10 +184,16 @@ router.get('/cleanup', async (req, res) => {
   const soldRes      = await deleteListingBatch(sold,      'cron_cleanup_sold');
   const abandonedRes = await deleteListingBatch(abandoned, 'cron_cleanup_expired');
 
+  // Backstop for the lazy feed-time boost expiry: demote any timed boosts that
+  // have lapsed (in case traffic was too low to trigger the lazy sweep).
+  let boostsExpired = 0;
+  try { boostsExpired = await expireBoosts(); } catch (e) { console.error('[cron] expireBoosts failed:', e.message); }
+
   const summary = {
     job: 'cleanup',
     sold:      { candidates: sold.length,      ...soldRes },
     abandoned: { candidates: abandoned.length, ...abandonedRes },
+    boostsExpired,
   };
   console.log(JSON.stringify(summary));
   res.json({ ok: true, ...summary });

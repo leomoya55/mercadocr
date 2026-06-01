@@ -19,6 +19,15 @@ async function buildProfileResponse(uid, user, email) {
   const maxListings  = plan.maxListings === Infinity ? null : plan.maxListings;
   const remaining    = maxListings === null ? null : Math.max(0, maxListings - listingCount);
 
+  // ── Downgrade grandfathering (Option A) ──────────────────────────────────────
+  // When a paid plan lapses/downgrades, the user keeps ALL existing listings live
+  // (we never archive). But they have more active listings than the new plan
+  // allows, so they can't create new ones until they upgrade or reduce. Surface
+  // that state explicitly so the UI can show a clear, non-alarming banner instead
+  // of a bare "limit reached" error.
+  const overLimit = maxListings !== null && listingCount > maxListings;
+  const excess    = overLimit ? listingCount - maxListings : 0;
+
   return {
     user,
     plan: eff.plan,                      // canonical resolved tier
@@ -28,8 +37,10 @@ async function buildProfileResponse(uid, user, email) {
       status: eff.status,
       currentPeriodEnd: eff.currentPeriodEnd,
       cancelAtPeriodEnd: eff.cancelAtPeriodEnd,
+      expired: eff.expired,
     },
     listingCount, remaining, maxListings, credits,
+    overLimit, excess,
   };
 }
 

@@ -21,6 +21,8 @@ const { ensureUser }  = require('../middleware/ensureUser');
 const {
   stripe, PRICE_IDS, hasPriceIds, tierFromSubscription, getPeriodEnd,
 } = require('../config/stripe');
+const { isBoostType, getBoostPackage, applyBoost } = require('../config/featured');
+const { syncSellerProListings } = require('../config/membership');
 const { captureException } = require('../config/sentry');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ async function getOrCreateCustomer(user) {
  */
 async function syncSubscriptionToUser(uid, subscription, { downgrade = false } = {}) {
   if (downgrade) {
-    return User.findOneAndUpdate(
+    const u = await User.findOneAndUpdate(
       { firebaseUid: uid },
       { $set: {
           plan: 'free',
@@ -88,12 +90,14 @@ async function syncSubscriptionToUser(uid, subscription, { downgrade = false } =
       } },
       { new: true }
     );
+    await syncSellerProListings(uid, false); // lost Pro → drop priority on listings
+    return u;
   }
 
   const tier = tierFromSubscription(subscription) || 'free';
   const periodEnd = getPeriodEnd(subscription);
 
-  return User.findOneAndUpdate(
+  const u = await User.findOneAndUpdate(
     { firebaseUid: uid },
     { $set: {
         plan: tier,
@@ -109,6 +113,8 @@ async function syncSubscriptionToUser(uid, subscription, { downgrade = false } =
     } },
     { new: true }
   );
+  await syncSellerProListings(uid, tier === 'pro');
+  return u;
 }
 
 /**
@@ -133,14 +139,14 @@ router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res
   const user = req.dbUser;
   const { type } = req.body;
 
-  if (!type)                                       return res.status(400).json({ error: 'Missing type' });
-  if (!['single', 'basic', 'pro'].includes(type))  return res.status(400).json({ error: 'Invalid payment type' });
+  if (!type)                                                  return res.status(400).json({ error: 'Missing type' });
+  if (!['single', 'basic', 'pro', 'boost'].includes(type))    return res.status(400).json({ error: 'Invalid payment type' });
 
   // Reject buying the plan you already actively hold (resolver-validated, not the
   // raw stored field — a stale 'pro' that already expired should be re-buyable).
   const { getEffectiveMembership } = require('../config/membership');
   const eff = getEffectiveMembership(user, req.email);
-  if (type !== 'single' && eff.plan === type && eff.active) {
+  if (type !== 'single' && type !== 'boost' && eff.plan === type && eff.active) {
     const label = type === 'pro' ? 'Pro' : 'Basic';
     return res.status(400).json({ error: 'already_on_plan', message: `Ya tienes el plan ${label} activo.` });
   }
@@ -171,6 +177,44 @@ router.post('/create-checkout-session', verifyToken, ensureUser, async (req, res
         // metadata on BOTH the session and the resulting PaymentIntent for safety
         metadata: { uid, type: 'single' },
         payment_intent_data: { metadata: { uid, type: 'single' } },
+      });
+      return res.json({ id: session.id, url: session.url });
+    }
+
+    // ── One-time featured/boost purchase (per listing) ─────────────────────
+    if (type === 'boost') {
+      const { boostType } = req.body;
+      const listingId = req.body.listingId;
+      if (!isBoostType(boostType)) return res.status(400).json({ error: 'Invalid boost type' });
+      if (!listingId)              return res.status(400).json({ error: 'Missing listingId' });
+
+      // Ownership check — never let a user pay to boost a listing that isn't theirs.
+      const Listing = require('../models/listing.model');
+      const listing = await Listing.findOne({ _id: listingId, author: uid })
+        .select('name hidden status').lean().catch(() => null);
+      if (!listing) {
+        return res.status(404).json({ error: 'listing_not_found', message: 'No encontramos ese anuncio en tu cuenta.' });
+      }
+
+      const pkg = getBoostPackage(boostType);
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        customer: customerId,
+        line_items: [{
+          price_data: {
+            currency: 'crc',
+            product_data: {
+              name: pkg.label + ' - MercaTico',
+              description: 'Destaca tu anuncio: ' + (listing.name || '').slice(0, 80),
+            },
+            unit_amount: pkg.amount,
+          },
+          quantity: 1,
+        }],
+        success_url: `${origin}/dashboard?boost_success=true`,
+        cancel_url:  `${origin}/dashboard?boost_canceled=true`,
+        metadata:             { uid, type: 'boost', boostType, listingId: String(listingId) },
+        payment_intent_data:  { metadata: { uid, type: 'boost', boostType, listingId: String(listingId) } },
       });
       return res.json({ id: session.id, url: session.url });
     }
@@ -306,6 +350,21 @@ router.post('/webhook', async (req, res) => {
               { firebaseUid: uid },
               { $inc: { singlePostCredits: 1 } }
             );
+          }
+        }
+        // Featured/boost one-time payment → apply the boost to the listing.
+        if (session.mode === 'payment' && session.metadata?.type === 'boost') {
+          const { uid, boostType, listingId } = session.metadata;
+          if (uid && session.payment_status === 'paid') {
+            const updated = await applyBoost(listingId, uid, boostType);
+            if (!updated) {
+              // Paid for a boost we couldn't apply (listing deleted/changed owner
+              // between checkout and webhook). Alert so it can be refunded manually.
+              console.error('[webhook] BOOST PAID BUT NOT APPLIED — refund needed:', { listingId, uid, boostType, session: session.id });
+              captureException(new Error('boost_paid_not_applied'), {
+                where: 'stripe_webhook_boost', listingId, uid, boostType, sessionId: session.id,
+              });
+            }
           }
         }
         // Subscription checkouts are fully handled by the subscription.* events

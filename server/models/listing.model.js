@@ -8,6 +8,10 @@ const listingSchema = new mongoose.Schema({
   description: { type: String, required: true },
   price:       { type: Number, required: true },
   category:    { type: String, required: true },
+  // Optional second-level category (e.g. 'Celulares' under 'Electrónica').
+  // Validated against the shared taxonomy (js/categories.js) in the route. '' when
+  // the category has no subcategories or the user didn't pick one.
+  subcategory: { type: String, default: '' },
   // Apparel size — only used for the 'Ropa y accesorios' category; '' otherwise.
   size:        { type: String, default: '' },
   // Real-estate details — only used for the 'Bienes Raíces' category.
@@ -36,10 +40,41 @@ const listingSchema = new mongoose.Schema({
   contact:     { type: String, default: '' },
   provincia:   { type: String, default: '' },
   author:      { type: String, required: true }, // Firebase UID
-  featured:    { type: Boolean, default: false },
-  hidden:      { type: Boolean, default: false }, // Admin moderation flag
+
+  // ─── Promotion / featured ───────────────────────────────────────────────────
+  // `featured` is the live flag used by the feed sort and badge. It can be set:
+  //   • manually by an admin (editorial), OR
+  //   • by a paid boost, which ALSO stamps featuredUntil/boostType/boostPurchaseDate.
+  // A paid boost is "active" while featuredUntil > now; the expiry cron clears
+  // `featured` + `featuredUntil` once it lapses. An admin/editorial feature has
+  // featured:true with featuredUntil:null (never auto-expires).
+  featured:        { type: Boolean, default: false },
+  hidden:          { type: Boolean, default: false }, // Admin moderation flag
+  featuredUntil:     { type: Date,   default: null },  // null = not a timed boost
+  boostType:         { type: String, enum: ['', '24h', '7d'], default: '' },
+  boostPurchaseDate: { type: Date,   default: null },
+
+  // Denormalized "is the seller a Pro member?" — powers Pro priority placement in
+  // the feed/search sort (a perk of Pro). Kept in sync when the author's plan
+  // changes (payment webhook, cron, admin) and set at creation. Best-effort for
+  // sorting; the displayed Featured-Seller badge is re-derived live in the feed
+  // response so it's always accurate even if a sync was missed.
+  sellerPro:         { type: Boolean, default: false },
+
+  // ─── Analytics (architecture now; dashboards later) ─────────────────────────
+  // These are additive counters so we can build seller analytics for Pro without
+  // a later migration. `views` already existed; clicks/favorites/leads are new.
+  //   views     — unique authenticated viewers of the product page
+  //   clicks    — contact-intent clicks (WhatsApp / email / apply-link)
+  //   favorites — number of users who saved this listing
+  //   leads     — qualified contact events (currently == clicks; reserved so the
+  //               definition can tighten later without another migration)
   views:       { type: Number, default: 0 },
+  clicks:      { type: Number, default: 0 },
+  favorites:   { type: Number, default: 0 },
+  leads:       { type: Number, default: 0 },
   viewedBy:    [{ type: String }],               // Firebase UIDs — one entry per unique viewer
+  favoritedBy: [{ type: String }],               // Firebase UIDs — one entry per user who saved it
   status:      { type: String, enum: ['active', 'sold'], default: 'active' },
   // When the listing was marked sold. Sold listings stay visible in the seller's
   // panel for a week, then the cleanup-sold cron deletes the doc + Cloudinary
@@ -86,9 +121,19 @@ listingSchema.index(
  * price: range queries.
  */
 listingSchema.index({ status: 1, featured: -1, createdAt: -1 });
+// Main feed sort: boosted first, then Pro sellers, then newest.
+listingSchema.index({ status: 1, featured: -1, sellerPro: -1, createdAt: -1 });
 listingSchema.index({ status: 1, category: 1, createdAt: -1 });
+// Category + subcategory drill-down (subcategory filter on a chosen category).
+listingSchema.index({ status: 1, category: 1, subcategory: 1, createdAt: -1 });
 listingSchema.index({ status: 1, provincia: 1, createdAt: -1 });
 listingSchema.index({ status: 1, price: 1 });
+
+/**
+ * Powers the boost-expiry cron: find listings whose timed boost has lapsed.
+ * Partial-ish: only timed boosts set featuredUntil, so the scan stays small.
+ */
+listingSchema.index({ featuredUntil: 1 });
 
 module.exports = mongoose.model('Listing', listingSchema);
 module.exports.LISTING_ACTIVE_MS = LISTING_ACTIVE_MS;

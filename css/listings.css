@@ -4,28 +4,83 @@
 
 .categories-sidebar {
     width: 250px;
+    flex-shrink: 0;
     padding: 2rem;
-    border-right: 1px solid #e8c97a;
+    border-right: 1px solid #2a2a2a;
 }
 
 .categories-sidebar h3 {
     color: #e8c97a;
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
 }
 
-.categories-sidebar ul {
-    list-style: none;
-    padding: 0;
+/* ─── Category nav (taxonomy-driven) ─────────────────────────────────────────
+   Desktop: a clean vertical list. Each row is a full-width button so the hit
+   area and alignment are consistent. The active category's subcategories appear
+   indented directly beneath the category row. */
+.category-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
 }
 
-.categories-sidebar ul li a {
-    display: block;
-    padding: 0.5rem 0;
-    color: #fff;
-    text-decoration: none;
+.subcat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
 }
 
-.categories-sidebar ul li a:hover {
+.cat-item,
+.subcat-item {
+    /* Reset native button styling so these read as nav links */
+    appearance: none;
+    -webkit-appearance: none;
+    font: inherit;
+    text-align: left;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: #ddd;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.cat-item {
+    display: flex;
+    align-items: center;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.95rem;
+}
+
+.cat-item:hover { background: #1f1f1f; color: #fff; }
+
+.cat-item.is-active {
+    background: #e8c97a;
+    color: #0d0d0d;
+    font-weight: 700;
+}
+
+/* Subcategory list — nested directly under the active category, indented with a
+   connecting rail so it reads as a child of the category above it. */
+.subcat-row {
+    margin: 0.1rem 0 0.4rem 1.2rem;
+    padding-left: 0.7rem;
+    border-left: 2px solid #3a3a3a;
+}
+
+.subcat-item {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+.subcat-item:hover { background: #1f1f1f; color: #fff; }
+
+.subcat-item.is-active {
     color: #e8c97a;
+    font-weight: 600;
 }
 
 /* Add styles for listings page */
@@ -162,6 +217,17 @@
     flex-shrink: 0; /* never compress price — badges wrap instead */
 }
 
+.listing-item-subcat {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: #888;
+    background: #232323;
+    border: 1px solid #303030;
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    margin-bottom: 0.35rem;
+}
+
 .listing-item-location {
     font-size: 0.8rem;
     color: #888;
@@ -277,6 +343,11 @@
     cursor: not-allowed;
 }
 
+/* ─── Tablet / mobile (≤900px) ───────────────────────────────────────────────
+   The sidebar moves above the grid but KEEPS the clean desktop layout: a vertical
+   list of full-width category rows, with the active category's subcategories
+   nested + indented directly beneath it. (Same accordion as laptop, just full
+   width.) */
 @media (max-width: 900px) {
     .listings-layout {
         flex-direction: column;
@@ -284,16 +355,28 @@
 
     .categories-sidebar {
         width: 100%;
+        flex-shrink: 1;
+        padding: 1rem 1.25rem;
         border-right: none;
-        border-bottom: 1px solid #222;
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
+        border-bottom: 1px solid #2a2a2a;
     }
 
-    .categories-sidebar ul {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.8rem 1rem;
+    .categories-sidebar h3 {
+        margin-bottom: 0.6rem;
     }
+
+    .listings-page { padding: 1rem; }
+}
+
+/* ─── Small phones (≤480px) ──────────────────────────────────────────────────
+   Two-column product grid so cards aren't full-width-huge on small screens. */
+@media (max-width: 480px) {
+    .listings-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .listing-item img { height: 130px; }
+    .listing-item-content { padding: 0.6rem; }
+    .listing-item-title { font-size: 0.95rem; }
 }

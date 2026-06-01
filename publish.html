@@ -46,6 +46,7 @@
                 <span id="publish-plan-badge"></span>
                 <a href="/pricing" id="publish-upgrade-hint" class="hidden">Ver planes y precios →</a>
             </div>
+            <div class="over-limit-banner hidden" id="over-limit-banner" role="status"></div>
             <div class="publish-status" id="publish-status"></div>
             <div class="publish-payments hidden" id="publish-payments">
                 <div class="payment-card">
@@ -74,19 +75,20 @@
                             <label for="name">Título del Anuncio</label>
                             <input type="text" id="name" name="name" required>
                         </div>
-                        <div class="form-group">
-                            <label for="category">Categoría</label>
-                            <select id="category" name="category" required>
-                                <option value="" disabled selected>Selecciona una categoría</option>
-                                <option value="Ropa y accesorios">Ropa y accesorios</option>
-                                <option value="Electrónica">Electrónica</option>
-                                <option value="Hogar y muebles">Hogar y muebles</option>
-                                <option value="Vehículos">Vehículos</option>
-                                <option value="Bienes Raíces">Bienes Raíces</option>
-                                <option value="Empleos">Empleos</option>
-                                <option value="Servicios">Servicios</option>
-                                <option value="Otros">Otros</option>
-                            </select>
+                        <div class="form-row row-collapsed" id="category-row">
+                            <div class="form-group">
+                                <label for="category">Categoría</label>
+                                <!-- Options are populated from the shared taxonomy (js/categories.js). -->
+                                <select id="category" name="category" required>
+                                    <option value="" disabled selected>Selecciona una categoría</option>
+                                </select>
+                            </div>
+                            <div class="form-group hidden" id="subcategory-group">
+                                <label for="subcategory">Subcategoría <span class="field-optional">(opcional)</span></label>
+                                <select id="subcategory" name="subcategory">
+                                    <option value="" selected>Todas</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-group hidden" id="size-group">
                             <label for="size">Talla</label>
@@ -228,7 +230,7 @@
                         <div class="form-group">
                             <label for="description">Descripción</label>
                             <textarea id="description" name="description" rows="6" required minlength="20"></textarea>
-                            <small id="description-counter" class="description-counter">0/20 caracteres</small>
+                            <small id="description-counter" class="description-counter">0/10 caracteres</small>
                         </div>
 
                         <div class="form-group">
@@ -255,11 +257,16 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+    <!-- Client-side image compression (shrinks large phone photos before upload).
+         Self-hosted (vendored from browser-image-compression@2.0.2) — no third-party
+         CDN dependency on the publish path. -->
+    <script src="js/vendor/browser-image-compression.js?v=2.0.2"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/config.js?v=12"></script>
+    <script src="js/categories.js?v=1"></script>
     <script src="js/user-store.js?v=12"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=16"></script>
-    <script src="js/publish.js?v=19"></script>
+    <script src="js/publish.js?v=21"></script>
 </body>
 </html>
