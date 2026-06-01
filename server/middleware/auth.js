@@ -30,7 +30,7 @@ const verifyToken = async (req, res, next) => {
         return res.status(401).json({ error: 'Token missing UID', code: 'NO_UID_IN_TOKEN' });
       }
       req.uid   = decoded.uid;
-      req.email = (decoded.email || '').toLowerCase().trim();
+      req.user = { uid: decoded.uid, email: (decoded.email || '').toLowerCase().trim() };
     } else {
       // ── INSECURE dev-only fallback ──────────────────────────────────────────
       // Decodes the JWT payload WITHOUT verifying the signature. This trusts any
@@ -45,12 +45,14 @@ const verifyToken = async (req, res, next) => {
       const payloadB64 = token.split('.')[1];
       const json = Buffer.from(payloadB64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
       const payload = JSON.parse(json);
-      req.uid   = payload.user_id || payload.sub;
-      req.email = (payload.email || '').toLowerCase().trim();
-      if (!req.uid) throw new Error('No UID in token');
+      const uid = payload.user_id || payload.sub;
+      if (!uid) throw new Error('No UID in token');
+      req.uid = uid;
+      req.user = { uid, email: (payload.email || '').toLowerCase().trim() };
     }
     next();
-  } catch {
+  } catch (error) {
+    console.error('Token verification error:', error);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
