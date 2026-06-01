@@ -446,47 +446,48 @@ router.put('/:id',
   ensureVerified,
   upload.array('images', 10),
   async (req, res) => {
-    configureCloudinary();
-    const uid     = req.uid;
-    const listing = await Listing.findById(req.params.id);
-    if (!listing)             return res.status(404).json('Listing not found');
-    if (listing.author !== uid) return res.status(403).json('Not authorized');
+    try {
+      configureCloudinary();
+      const uid     = req.uid;
+      const listing = await Listing.findById(req.params.id);
+      if (!listing)             return res.status(404).json('Listing not found');
+      if (listing.author !== uid) return res.status(403).json('Not authorized');
 
-    const { name, description, price, category, condition } = req.body;
+      const { name, description, price, category, condition } = req.body;
 
-    // Back-fill provincia/contact from profile if still missing on listing
-    if (!listing.provincia || !listing.contact) {
-      const user = await User.findOne({ firebaseUid: uid }).lean();
-      if (user) {
-        if (!listing.provincia) listing.provincia = user.provincia || '';
-        if (!listing.contact)   listing.contact   = user.phone || user.email || '';
+      // Back-fill provincia/contact from profile if still missing on listing
+      if (!listing.provincia || !listing.contact) {
+        const user = await User.findOne({ firebaseUid: uid }).lean();
+        if (user) {
+          if (!listing.provincia) listing.provincia = user.provincia || '';
+          if (!listing.contact)   listing.contact   = user.phone || user.email || '';
+        }
       }
-    }
 
-    listing.name        = name;
-    listing.description = description;
-    listing.price       = price;
-    listing.category    = category;
-    if (condition !== undefined) listing.condition = condition || '';
-    // Size only applies to the clothing category; cleared otherwise.
-    listing.size = category === 'Ropa y accesorios'
-      ? String(req.body.size || '').trim().slice(0, 30)
-      : '';
-    // Real-estate details only apply to the Bienes Raíces category; cleared otherwise.
-    listing.realEstate = category === RE_CATEGORY
-      ? parseRealEstate(req.body)
-      : { operation: '', propertyType: '', area: null, bedrooms: null, bathrooms: null };
-    if (req.files && req.files.length > 0) {
-      listing.photos = req.files.map(f => f.path);
-    }
+      listing.name        = name;
+      listing.description = description;
+      listing.price       = price;
+      listing.category    = category;
+      if (condition !== undefined) listing.condition = condition || '';
+      // Size only applies to the clothing category; cleared otherwise.
+      listing.size = category === 'Ropa y accesorios'
+        ? String(req.body.size || '').trim().slice(0, 30)
+        : '';
+      // Real-estate details only apply to the Bienes Raíces category; cleared otherwise.
+      listing.realEstate = category === RE_CATEGORY
+        ? parseRealEstate(req.body)
+        : { operation: '', propertyType: '', area: null, bedrooms: null, bathrooms: null };
+      if (req.files && req.files.length > 0) {
+        listing.photos = req.files.map(f => f.path);
+      }
 
-    await listing.save();
-    res.json('Listing updated');
-  } catch (err) {
-    console.error('[POST /update]', err);
-    res.status(500).json('Error: ' + err.message);
-  }
-});
+      await listing.save();
+      res.json('Listing updated');
+    } catch (err) {
+      console.error('[POST /update]', err);
+      res.status(500).json('Error: ' + err.message);
+    }
+  });
 
 /**
  * POST /mark-sold/:id
