@@ -69,7 +69,8 @@ document.addEventListener('DOMContentLoaded', function () {
     fetch(url, { method: 'POST', keepalive: true }).catch(function () {});
   }
 
-  listingsContainer.addEventListener('click', function (e) {
+  // Card navigation handlers — shared by the main grid AND the featured strip.
+  function onCardClick(e) {
     if (e.target.closest('.listing-wa-btn')) {
       var waCard = e.target.closest('.listing-item[data-id]');
       if (waCard) trackClick(waCard.dataset.id); // count the contact, then let the link open
@@ -77,14 +78,23 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var card = e.target.closest('.listing-item[data-id]');
     if (card) window.location.href = '/product?id=' + card.dataset.id;
-  });
-
-  listingsContainer.addEventListener('keydown', function (e) {
+  }
+  function onCardKeydown(e) {
     if (e.key !== 'Enter') return;
     if (e.target.closest('.listing-wa-btn')) return;
     var card = e.target.closest('.listing-item[data-id]');
     if (card) window.location.href = '/product?id=' + card.dataset.id;
-  });
+  }
+
+  var featuredStrip     = document.getElementById('featured-strip');
+  var featuredStripGrid = document.getElementById('featured-strip-grid');
+
+  listingsContainer.addEventListener('click', onCardClick);
+  listingsContainer.addEventListener('keydown', onCardKeydown);
+  if (featuredStripGrid) {
+    featuredStripGrid.addEventListener('click', onCardClick);
+    featuredStripGrid.addEventListener('keydown', onCardKeydown);
+  }
 
   // ─── Card builder ─────────────────────────────────────────────────────────
   function buildCard(listing) {
@@ -368,11 +378,37 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // ─── Featured ("Anuncios destacados") strip ───────────────────────────────
+  // Shows ONLY currently-paid/featured listings, above the regular grid. Reflects
+  // the selected category/subcategory; hidden during search and when none exist.
+  function loadFeaturedStrip() {
+    if (!featuredStrip || !featuredStripGrid) return;
+    if (currentParams.q) { featuredStrip.classList.add('hidden'); return; }
+    var qs = 'featured=true&limit=12';
+    if (currentParams.category) qs += '&category=' + encodeURIComponent(currentParams.category);
+    if (currentParams.category && currentParams.subcategory) {
+      qs += '&subcategory=' + encodeURIComponent(currentParams.subcategory);
+    }
+    fetch(API_BASE_URL + '/api/listings?' + qs)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var list = data ? (Array.isArray(data) ? data : (data.listings || [])) : [];
+        featuredStripGrid.innerHTML = '';
+        if (!list.length) { featuredStrip.classList.add('hidden'); return; }
+        var frag = document.createDocumentFragment();
+        list.forEach(function (l) { frag.appendChild(buildCard(l)); });
+        featuredStripGrid.appendChild(frag);
+        featuredStrip.classList.remove('hidden');
+      })
+      .catch(function () { featuredStrip.classList.add('hidden'); });
+  }
+
   function applyCategoryChange() {
     renderSidebar();
     updateHeading();
     syncUrl();
     fetchAndRender();
+    loadFeaturedStrip();
   }
 
   // Search bar — submit on button click or Enter key
@@ -383,6 +419,7 @@ document.addEventListener('DOMContentLoaded', function () {
     currentParams.q    = (searchInput ? searchInput.value.trim() : '');
     currentParams.page = 1;
     fetchAndRender();
+    loadFeaturedStrip(); // hides itself while a search query is active
   }
 
   if (searchBtn)   searchBtn.addEventListener('click', applySearch);
@@ -449,4 +486,5 @@ document.addEventListener('DOMContentLoaded', function () {
   renderSidebar();
   updateHeading();
   fetchAndRender();
+  loadFeaturedStrip();
 });

@@ -214,6 +214,9 @@ router.get('/', async (req, res) => {
     }
     if (condition) filter.condition  = condition;
     if (provincia) filter.provincia  = provincia;
+    // featured=true → only currently-featured (paid boosts + editorial). The lazy
+    // boost sweep above already cleared lapsed boosts, so this is accurate.
+    if (req.query.featured === 'true') filter.featured = true;
 
     const min = parseFloat(minPrice);
     const max = parseFloat(maxPrice);
