@@ -186,7 +186,10 @@ router.get('/', async (req, res) => {
     if (q && q.trim()) {
       filter.$text = { $search: q.trim() };
     }
+    // Jobs live on their own /empleos page — keep them out of the general
+    // products feed unless the category is explicitly requested.
     if (category)  filter.category  = category;
+    else           filter.category  = { $ne: JOB_CATEGORY };
     if (condition) filter.condition  = condition;
     if (provincia) filter.provincia  = provincia;
 

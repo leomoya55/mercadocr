@@ -37,10 +37,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // The site uses CLEAN urls (/dashboard, not /dashboard.html), so normalize.
         const path = (window.location.pathname || '/').replace(/\.html$/, '');
         const PROTECTED = ['/dashboard', '/publish', '/settings', '/admin'];
-        if (user && !isVerified && PROTECTED.some(p => path === p || path.indexOf(p + '/') === 0)) {
-            try { sessionStorage.setItem('verificationEmail', user.email || ''); } catch (e) {}
-            window.location.replace('/verify-email');
-            return;
+        const onProtected = PROTECTED.some(p => path === p || path.indexOf(p + '/') === 0);
+        if (user && onProtected && !user.emailVerified) {
+            // The cached token can lag after a user verifies — refresh once before
+            // deciding, so we never bounce someone who already verified.
+            try { await user.reload(); } catch (e) {}
+            if (!auth.currentUser || !auth.currentUser.emailVerified) {
+                try { sessionStorage.setItem('verificationEmail', user.email || ''); } catch (e) {}
+                window.location.replace('/verify-email');
+                return;
+            }
         }
 
         document.querySelectorAll('[data-auth-only]').forEach(el => {

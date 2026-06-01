@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <link rel="icon" href="/images/logo-refined.svg" type="image/svg+xml">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Producto - MercaTico</title>
+    <title>Empleos - MercaTico</title>
+    <meta name="description" content="Encuentra y publica empleos en Costa Rica en MercaTico.">
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/product.css">
+    <link rel="stylesheet" href="css/listings.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body data-fixed-category="Empleos">
     <header>
         <nav>
             <a href="/" class="logo"><img src="/images/logo-refined.svg" class="logo-img" alt="" aria-hidden="true" width="50" height="42"><span>MercaTico</span></a>
@@ -36,8 +37,41 @@
     </header>
 
     <main>
-        <section class="product-page" id="product-detail">
-            <!-- Product details will be loaded here -->
+        <section class="listings-page" style="max-width:1100px;margin:0 auto;">
+            <h2>Empleos en Costa Rica</h2>
+            <p style="color:#aaa;margin-top:-0.5rem;">Encuentra trabajo o publica una vacante. <a href="/publish" data-publish-cta style="color:#e8c97a;">Publicar un empleo →</a></p>
+
+            <div class="search-bar">
+                <input type="search" id="search-q" placeholder="Buscar empleos (ej. cajero, contador)..." autocomplete="off">
+                <button id="search-btn" type="button">Buscar</button>
+            </div>
+
+            <div class="filters">
+                <select id="filter-provincia">
+                    <option value="">Cualquier provincia</option>
+                    <option>San José</option>
+                    <option>Alajuela</option>
+                    <option>Cartago</option>
+                    <option>Heredia</option>
+                    <option>Guanacaste</option>
+                    <option>Puntarenas</option>
+                    <option>Limón</option>
+                </select>
+                <select id="filter-sort">
+                    <option value="newest">Más recientes</option>
+                    <option value="featured">Destacados primero</option>
+                </select>
+                <button id="filter-button" type="button">Aplicar</button>
+                <button id="reset-button" type="button" class="btn-secondary">Limpiar</button>
+            </div>
+
+            <div id="listings-count" class="listings-count" aria-live="polite"></div>
+
+            <div class="listings-grid" id="listings-container" aria-live="polite">
+                <!-- Job listings loaded dynamically -->
+            </div>
+
+            <div class="listings-pagination" id="listings-pagination"></div>
         </section>
     </main>
 
@@ -55,6 +89,6 @@
     <script src="js/config.js?v=13"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=14"></script>
-    <script src="js/product.js?v=16"></script>
+    <script src="js/listings.js?v=15"></script>
 </body>
 </html>

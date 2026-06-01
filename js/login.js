@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const user = userCredential.user;
 
             if (!user.emailVerified) {
-                await auth.signOut();
+                // Keep them signed in (so "reenviar" works and the session
+                // doesn't drop) — just send them to verify their email.
                 sessionStorage.setItem('verificationEmail', user.email);
                 window.location.href = '/verify-email';
                 return;

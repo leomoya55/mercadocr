@@ -291,7 +291,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Reset button — clears all filters
+  // A page can lock the feed to a single category (e.g. the Empleos page),
+  // so the category sidebar/filters never switch it away.
+  var fixedCategory = document.body.getAttribute('data-fixed-category') || '';
+
+  // Reset button — clears all filters (keeps a locked category if present)
   var resetBtn = document.getElementById('reset-button');
   if (resetBtn) {
     resetBtn.addEventListener('click', function () {
@@ -301,15 +305,16 @@ document.addEventListener('DOMContentLoaded', function () {
       var mn   = document.getElementById('min-price');       if (mn)   mn.value   = '';
       var mx   = document.getElementById('max-price');       if (mx)   mx.value   = '';
       var srt  = document.getElementById('filter-sort');     if (srt)  srt.value  = 'newest';
-      currentParams = { q:'', category:'', condition:'', provincia:'', minPrice:'', maxPrice:'', sort:'newest', page:1 };
+      currentParams = { q:'', category: fixedCategory, condition:'', provincia:'', minPrice:'', maxPrice:'', sort:'newest', page:1 };
       fetchAndRender();
     });
   }
 
   // ─── Initial load ─────────────────────────────────────────────────────────
-  // Check URL for a pre-selected category (e.g. from homepage category links)
   var urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('category')) {
+  if (fixedCategory) {
+    currentParams.category = fixedCategory; // locked page (e.g. Empleos)
+  } else if (urlParams.get('category')) {
     currentParams.category = urlParams.get('category');
   }
   if (urlParams.get('q')) {
