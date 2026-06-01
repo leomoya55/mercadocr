@@ -1,20 +1,7 @@
 const admin = require('firebase-admin');
 
-const hasAdminConfig = !!(
-  process.env.FIREBASE_PROJECT_ID &&
-  process.env.FIREBASE_CLIENT_EMAIL &&
-  process.env.FIREBASE_PRIVATE_KEY
-);
-
-if (hasAdminConfig && !admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+// Firebase Admin is now initialized globally in server.js
+// This middleware just uses the already-initialized instance
 
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -23,6 +10,12 @@ const verifyToken = async (req, res, next) => {
   }
   const token = authHeader.split('Bearer ')[1];
   try {
+    const hasAdminConfig = !!(
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
+    );
+    
     if (hasAdminConfig) {
       // Full cryptographic verification (production + any env with Firebase creds)
       const decoded = await admin.auth().verifyIdToken(token);
@@ -31,6 +24,7 @@ const verifyToken = async (req, res, next) => {
       }
       req.uid   = decoded.uid;
       req.user = { uid: decoded.uid, email: (decoded.email || '').toLowerCase().trim() };
+      req.email = (decoded.email || '').toLowerCase().trim();
     } else {
       // ── INSECURE dev-only fallback ──────────────────────────────────────────
       // Decodes the JWT payload WITHOUT verifying the signature. This trusts any
@@ -49,10 +43,11 @@ const verifyToken = async (req, res, next) => {
       if (!uid) throw new Error('No UID in token');
       req.uid = uid;
       req.user = { uid, email: (payload.email || '').toLowerCase().trim() };
+      req.email = (payload.email || '').toLowerCase().trim();
     }
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('Token verification error:', error.message);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };

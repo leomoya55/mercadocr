@@ -3,6 +3,28 @@
 const sentry = require('./config/sentry');
 require('dotenv').config();
 
+// Initialize Firebase Admin BEFORE anything else that might use it
+const admin = require('firebase-admin');
+const hasAdminConfig = !!(
+  process.env.FIREBASE_PROJECT_ID &&
+  process.env.FIREBASE_CLIENT_EMAIL &&
+  process.env.FIREBASE_PRIVATE_KEY
+);
+if (hasAdminConfig && !admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      }),
+    });
+    console.log('[Firebase] Admin SDK initialized');
+  } catch (err) {
+    console.error('[Firebase] Initialization error:', err.message);
+  }
+}
+
 const express   = require('express');
 const mongoose  = require('mongoose');
 const cors      = require('cors');

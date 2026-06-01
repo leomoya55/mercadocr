@@ -1,6 +1,17 @@
 const admin = require('firebase-admin');
 
 async function ensureVerified(req, res, next) {
+    // Verify that Firebase Admin is initialized and req.user is set
+    if (!req.user || !req.user.uid) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Check if Firebase Admin is available
+    if (!admin.apps.length) {
+        console.error('Firebase Admin SDK not initialized');
+        return res.status(500).json({ error: 'Service temporarily unavailable' });
+    }
+
     const { uid } = req.user;
 
     try {
@@ -13,8 +24,8 @@ async function ensureVerified(req, res, next) {
         }
         next();
     } catch (error) {
-        console.error('Error checking email verification status:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('Error checking email verification status:', error.message);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 }
 
