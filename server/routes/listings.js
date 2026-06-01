@@ -28,6 +28,7 @@ function parseRealEstate(body) {
   const operation    = VALID_RE_OPS.has(String(body.re_operation || '')) ? String(body.re_operation || '') : '';
   const propertyType = VALID_RE_TYPES.has(String(body.re_type || '')) ? String(body.re_type || '') : '';
   const toNum = (v, max) => {
+    if (v === undefined || v === null || String(v).trim() === '') return null;
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
   };
@@ -378,6 +379,7 @@ router.post('/add',
       //    refund it so the user never pays ₡500 for a rejected post.
       const { errors, clean } = validateListingInput(req.body);
       if (errors.length) {
+        console.warn('[POST /add] validation failed:', errors.join(' '), '| category:', JSON.stringify(req.body.category));
         await refundCreditIfUsed(req);
         await deleteUploadedFiles(req.files); // don't leave orphaned images for a rejected post
         return res.status(400).json({ error: errors.join(' '), code: 'VALIDATION' });

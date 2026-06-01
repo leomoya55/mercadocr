@@ -289,9 +289,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      // ── Pre-submit validation: instant, clear feedback for any missing field,
+      //    on any category — so problems never surface as a vague server error. ──
+      const nameValue = (form.name.value || '').trim();
+      if (nameValue.length < 3) {
+        Toast.error('El título debe tener al menos 3 caracteres.');
+        return;
+      }
+      if (!form.category.value) {
+        Toast.error('Selecciona una categoría.');
+        return;
+      }
+      if (!priceHidden.value || Number(priceHidden.value) < 0) {
+        Toast.error('Ingresá un precio válido.');
+        return;
+      }
       const descriptionValue = descriptionInput.value || '';
       if (descriptionValue.length < minDescriptionLength) {
         Toast.error(`La descripción debe tener al menos ${minDescriptionLength} caracteres.`);
+        return;
+      }
+      if (!isEditMode && imagesInput && (!imagesInput.files || imagesInput.files.length === 0)) {
+        Toast.error('Agregá al menos una foto de tu anuncio.');
         return;
       }
 
@@ -307,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
           : '/api/listings/add';
 
         const response = await authFetch(endpoint, {
-          method: isEditMode ? 'PUT' : 'POST',
+          method: 'POST', // both /add and /update/:id are POST routes on the server
           body: formData,
         });
 
@@ -343,15 +362,17 @@ document.addEventListener('DOMContentLoaded', () => {
           showPayments();
 
         } else {
-          // Surface the server's specific reason (e.g. unsupported image, file
-          // too large, validation) instead of a generic message, so the user
-          // knows what to fix — especially important on mobile.
-          const errData = await response.json().catch(() => null);
+          // Always surface the server's specific reason so the user knows what
+          // to fix. Read the body once as text, then try to parse JSON; if there
+          // is no message, fall back to the HTTP status so it's never a dead end.
+          const raw = await response.text().catch(() => '');
+          let errData = null;
+          try { errData = JSON.parse(raw); } catch { /* not JSON */ }
           const msg = (errData && errData.error)
             ? errData.error
-            : 'Error al publicar. Por favor intenta de nuevo.';
-          Toast.error(msg);
-          console.error('[publish] server error:', response.status, errData);
+            : `No se pudo publicar (código ${response.status}). ${raw ? raw.slice(0, 160) : 'Intenta de nuevo.'}`;
+          Toast.error(msg, 7000);
+          console.error('[publish] server error:', response.status, errData || raw);
         }
       } catch (error) {
         console.error('[publish] network error:', error);
