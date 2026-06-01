@@ -92,6 +92,32 @@ nav a:hover {
     color: #e8c97a;
 }
 
+/* Mobile menu toggle — hidden on desktop, shown on small screens (top-right). */
+.nav-toggle {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #f0f0f0;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 0.85rem;
+    border-radius: 9px;
+    cursor: pointer;
+    max-width: 62vw;
+    line-height: 1;
+}
+.nav-toggle:hover { border-color: #e8c97a; color: #e8c97a; }
+.nav-toggle .nav-toggle-label {
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.nav-toggle .nav-toggle-icon { font-size: 1.1rem; }
+
 .hero {
     text-align: center;
     padding: 6rem 2rem;
@@ -389,10 +415,47 @@ footer {
 }
 
 @media (max-width: 768px) {
+    /* Logo left, account/menu button right; links collapse into a panel. */
     nav {
-        flex-direction: column;
-        gap: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
+    .nav-toggle { display: inline-flex; }
+
+    nav > ul {
+        display: none;            /* hidden until the toggle opens it */
+        order: 3;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        margin-top: 0.6rem;
+        border-top: 1px solid #222;
+    }
+    nav > ul.nav-open { display: flex; }
+
+    nav > ul > li { width: 100%; }
+    nav > ul > li > a,
+    .nav-user-btn {
+        display: block;
+        width: 100%;
+        padding: 0.9rem 0.25rem;
+        border-bottom: 1px solid #1c1c1c;
+    }
+
+    /* Account submenu shows inline within the panel (no floating dropdown). */
+    .nav-user-menu { position: static; }
+    .nav-dropdown {
+        display: block;
+        position: static;
+        border: none;
+        box-shadow: none;
+        background: transparent;
+        min-width: 0;
+        padding: 0;
+    }
+    .nav-dropdown a,
+    .nav-logout-btn { padding-left: 1.25rem; }
 
     .hero {
         padding: 4rem 1.5rem;
