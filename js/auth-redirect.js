@@ -32,10 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
     auth.onAuthStateChanged(async user => {
         const isVerified = user && user.emailVerified;
 
-        // Redirect unverified users from protected pages
-        const protectedPaths = ['/dashboard.html', '/publish.html', '/settings.html', '/admin.html', '/listings.html'];
-        if (user && !isVerified && protectedPaths.includes(window.location.pathname)) {
-            window.location.href = '/verify-email.html';
+        // Redirect unverified users away from protected pages (panel, publishing,
+        // settings, admin). Public pages (home, listings, product) stay open.
+        // The site uses CLEAN urls (/dashboard, not /dashboard.html), so normalize.
+        const path = (window.location.pathname || '/').replace(/\.html$/, '');
+        const PROTECTED = ['/dashboard', '/publish', '/settings', '/admin'];
+        if (user && !isVerified && PROTECTED.some(p => path === p || path.indexOf(p + '/') === 0)) {
+            try { sessionStorage.setItem('verificationEmail', user.email || ''); } catch (e) {}
+            window.location.replace('/verify-email');
             return;
         }
 

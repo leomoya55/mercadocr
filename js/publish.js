@@ -1,5 +1,3 @@
-import imageCompression from 'https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.mjs';
-
 document.addEventListener('DOMContentLoaded', () => {
   const form          = document.getElementById('publish-form');
   const submitButton  = document.getElementById('submit-button');
@@ -299,6 +297,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── Publish form submit ──────────────────────────────────────────────────
   if (form) {
+    const getUploadSignature = async () => {
+      const response = await authFetch('/api/listings/upload-signature', { method: 'POST' });
+      if (!response.ok) {
+        const raw = await response.text().catch(() => '');
+        throw new Error(raw || 'No se pudo preparar la subida de imágenes.');
+      }
+      return response.json();
+    };
+
+    const uploadImagesDirect = async (files) => {
+      if (!files || files.length === 0) return [];
+      setStatus('Subiendo imágenes...');
+
+      const sig = await getUploadSignature();
+      const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`;
+
+      const uploads = files.map(async (file) => {
+        const data = new FormData();
+        data.append('file', file);
+        data.append('api_key', sig.apiKey);
+        data.append('timestamp', sig.timestamp);
+        data.append('signature', sig.signature);
+        if (sig.folder) data.append('folder', sig.folder);
+        if (sig.transformation) data.append('transformation', sig.transformation);
+        if (sig.format) data.append('format', sig.format);
+
+        const response = await fetch(uploadUrl, { method: 'POST', body: data });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.secure_url) {
+          const msg = payload.error && payload.error.message
+            ? payload.error.message
+            : 'No se pudo subir una imagen.';
+          throw new Error(msg);
+        }
+        return payload.secure_url;
+      });
+
+      const urls = await Promise.all(uploads);
+      setStatus('');
+      return urls;
+    };
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!currentUser) {
@@ -338,41 +378,42 @@ document.addEventListener('DOMContentLoaded', () => {
       submitButton.disabled = true;
       submitButton.textContent = 'Publicando...';
 
-      const formData = new FormData();
-      // Manually append all fields EXCEPT files
-      for (const [key, value] of new FormData(form).entries()) {
-        if (key !== 'images') {
-          formData.append(key, value);
-        }
-      }
+      const listingName = nameValue;
+      const imageFiles = imagesInput ? Array.from(imagesInput.files || []) : [];
 
-      // Compress and append images
-      const imageFiles = imagesInput ? Array.from(imagesInput.files) : [];
-      if (imageFiles.length > 0) {
-        setStatus('Comprimiendo imágenes...');
-        const options = {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-        };
-        try {
-          const compressedFiles = await Promise.all(imageFiles.map(file => imageCompression(file, options)));
-          compressedFiles.forEach(file => {
-            formData.append('images', file, file.name);
-          });
-        } catch (compressionError) {
-          console.error('Image compression error:', compressionError);
-          Toast.error('Hubo un error al procesar las imágenes. Intenta con otras fotos.');
+      let uploadedPhotos = [];
+      try {
+        if (imageFiles.length > 0) {
+          uploadedPhotos = await uploadImagesDirect(imageFiles);
+        } else if (!isEditMode) {
+          Toast.error('Agregá al menos una foto de tu anuncio.');
           submitButton.disabled = false;
           submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
-          setStatus('');
           return;
         }
+      } catch (uploadError) {
+        console.error('Cloudinary upload error:', uploadError);
+        Toast.error(uploadError.message || 'No se pudieron subir las imágenes.');
+        submitButton.disabled = false;
+        submitButton.textContent = isEditMode ? 'Guardar cambios' : 'Confirmar Publicación';
         setStatus('');
+        return;
       }
 
-
-      const listingName = formData.get('name') || '';
+      const payload = {
+        name: nameValue,
+        description: descriptionValue,
+        price: priceHidden.value,
+        category: form.category.value,
+        condition: form.condition ? form.condition.value : '',
+        size: sizeSelect ? sizeSelect.value : '',
+        re_operation: document.getElementById('re_operation')?.value || '',
+        re_type: document.getElementById('re_type')?.value || '',
+        re_area: document.getElementById('re_area')?.value || '',
+        re_bedrooms: document.getElementById('re_bedrooms')?.value || '',
+        re_bathrooms: document.getElementById('re_bathrooms')?.value || '',
+      };
+      if (uploadedPhotos.length > 0) payload.photos = uploadedPhotos;
 
       try {
         const endpoint = isEditMode
@@ -381,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const response = await authFetch(endpoint, {
           method: 'POST', // both /add and /update/:id are POST routes on the server
-          body: formData,
+          body: JSON.stringify(payload),
         });
 
         if (response.ok) {

@@ -323,75 +323,86 @@ router.get('/:id', async (req, res) => {
  * Handler has zero plan / limit logic — all of that lives in middleware.
  */
 
-/**
- * Wraps multer's upload.array so its errors become clean JSON instead of an
- * unhandled 500 (which the frontend can only show as a generic "Error al
- * publicar"). A rejected upload happens AFTER enforceListingLimit, so we refund
- * any credit it consumed before responding.
- */
-/**
- * Delete images already uploaded to Cloudinary for a request that is about to be
- * rejected (validation/banned content/no-photo race), so rejected posts never
- * leave orphaned images behind.
- */
-async function deleteUploadedFiles(files) {
-  if (!files || !files.length) return;
+// ─── Direct-to-Cloudinary uploads ────────────────────────────────────────────
+// Images upload straight from the browser to Cloudinary (bypassing the
+// serverless function's ~4.5MB request-body limit that caused 413 errors), then
+// the listing is created with just the resulting URLs. /upload-signature hands
+// the browser a short-lived signature so those uploads are authenticated.
+
+const MAX_PHOTOS = 10;
+
+/** Keep only well-formed Cloudinary URLs from OUR cloud + listings folder. */
+function validatePhotoUrls(arr) {
+  if (!Array.isArray(arr)) return [];
+  const prefix = 'https://res.cloudinary.com/' + (process.env.CLOUDINARY_CLOUD_NAME || '') + '/';
+  return arr
+    .filter(u => typeof u === 'string' && u.startsWith(prefix) && u.includes('/mercadocr/listings/'))
+    .slice(0, MAX_PHOTOS);
+}
+
+/** Delete photos from Cloudinary (cleanup after a rejected listing). */
+async function deletePhotoUrls(urls) {
+  if (!Array.isArray(urls) || !urls.length) return;
   try {
     configureCloudinary();
-    const publicIds = files
-      .map(f => f.filename || getPublicIdFromUrl(f.path))
-      .filter(Boolean);
+    const publicIds = urls.map(getPublicIdFromUrl).filter(Boolean);
     if (publicIds.length) await cloudinary.api.delete_resources(publicIds);
   } catch (e) {
-    console.error('[POST /add] cleanup of rejected uploads failed:', e.message);
+    console.error('[listings] cleanup of rejected photos failed:', e.message);
   }
 }
 
-function uploadPhotos(req, res, next) {
-  configureCloudinary(); // idempotent — guarantees credentials are set before upload
-  upload.array('photos')(req, res, async (err) => {
-    if (!err) return next();
-    await refundCreditIfUsed(req);
-    let message = 'No se pudieron subir las imágenes. Intenta de nuevo.';
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      message = 'Cada imagen debe pesar menos de 10 MB.';
-    } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-      message = 'Campo de imagen inesperado. Recarga la página e intenta de nuevo.';
-    } else if (err.message && /tipo de archivo/i.test(err.message)) {
-      message = err.message;
-    }
-    console.error('[POST /add] upload error:', err.code || err.http_code || '', err.message);
-    return res.status(400).json({ error: message, code: 'UPLOAD_ERROR' });
-  });
-}
+/**
+ * POST /upload-signature
+ * Hands the browser a short-lived Cloudinary signature for direct uploads.
+ * Gated to authenticated, email-verified users.
+ */
+router.post('/upload-signature', verifyToken, ensureVerified, (req, res) => {
+  try {
+    configureCloudinary();
+    const timestamp = Math.round(Date.now() / 1000);
+    const folder = 'mercadocr/listings';
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp, folder },
+      process.env.CLOUDINARY_API_SECRET
+    );
+    res.json({
+      signature, timestamp, folder,
+      apiKey: process.env.CLOUDINARY_API_KEY,
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    });
+  } catch (err) {
+    console.error('[POST /upload-signature]', err.message);
+    res.status(500).json({ error: 'No se pudo preparar la subida de imágenes.' });
+  }
+});
 
 router.post('/add',
-  createListingLimiter,
   verifyToken,
-  ensureUser,
   ensureVerified,
+  createListingLimiter,   // keyed by uid — runs after verifyToken sets req.uid
+  ensureUser,
   enforceListingLimit,
-  upload.array('images', 10),
   async (req, res) => {
     try {
       const uid  = req.uid;
       const user = req.dbUser;
+      const photos = validatePhotoUrls(req.body.photos); // image URLs, uploaded directly to Cloudinary
 
-      // 1. Server-side validation. If it fails AFTER a credit was consumed,
-      //    refund it so the user never pays ₡500 for a rejected post.
+      // 1. Server-side validation. On failure, refund any credit AND delete the
+      //    already-uploaded images so a rejected post never orphans them.
       const { errors, clean } = validateListingInput(req.body);
       if (errors.length) {
         console.warn('[POST /add] validation failed:', errors.join(' '), '| category:', JSON.stringify(req.body.category));
         await refundCreditIfUsed(req);
-        await deleteUploadedFiles(req.files); // don't leave orphaned images for a rejected post
+        await deletePhotoUrls(photos);
         return res.status(400).json({ error: errors.join(' '), code: 'VALIDATION' });
       }
-      if (!req.files || req.files.length === 0) {
+      if (photos.length === 0) {
         await refundCreditIfUsed(req);
         return res.status(400).json({ error: 'Se requiere al menos una foto.', code: 'NO_PHOTO' });
       }
 
-      const photos    = req.files.map(f => f.path);
       const provincia = user.provincia || '';
       const contact   = user.phone     || ''; // phone only — email is never a valid WA contact
 
@@ -417,6 +428,7 @@ router.post('/add',
         const activeCount = await getActiveCount(uid);
         if (activeCount > maxAllowed) {
           await Listing.deleteOne({ _id: newListing._id });
+          await deletePhotoUrls(photos);
           return res.status(402).json({
             error: 'Listing limit reached for your plan',
             code:  'LIMIT_REACHED',
@@ -440,46 +452,40 @@ router.post('/add',
  * Only the owner of the listing can update it.
  * Replaces photos only when new files are uploaded.
  */
-router.put('/:id',
+router.post('/update/:id',
   verifyToken,
-  ensureUser,
   ensureVerified,
-  upload.array('images', 10),
   async (req, res) => {
     try {
-      configureCloudinary();
       const uid     = req.uid;
       const listing = await Listing.findById(req.params.id);
-      if (!listing)             return res.status(404).json('Listing not found');
+      if (!listing)               return res.status(404).json('Listing not found');
       if (listing.author !== uid) return res.status(403).json('Not authorized');
 
-      const { name, description, price, category, condition } = req.body;
+      // Same validation (and prohibited-content filter) as new listings.
+      const { errors, clean } = validateListingInput(req.body);
+      if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 'VALIDATION' });
 
       // Back-fill provincia/contact from profile if still missing on listing
       if (!listing.provincia || !listing.contact) {
-        const user = await User.findOne({ firebaseUid: uid }).lean();
-        if (user) {
-          if (!listing.provincia) listing.provincia = user.provincia || '';
-          if (!listing.contact)   listing.contact   = user.phone || user.email || '';
+        const u = await User.findOne({ firebaseUid: uid }).lean();
+        if (u) {
+          if (!listing.provincia) listing.provincia = u.provincia || '';
+          if (!listing.contact)   listing.contact   = u.phone || '';
         }
       }
 
-      listing.name        = name;
-      listing.description = description;
-      listing.price       = price;
-      listing.category    = category;
-      if (condition !== undefined) listing.condition = condition || '';
-      // Size only applies to the clothing category; cleared otherwise.
-      listing.size = category === 'Ropa y accesorios'
-        ? String(req.body.size || '').trim().slice(0, 30)
-        : '';
-      // Real-estate details only apply to the Bienes Raíces category; cleared otherwise.
-      listing.realEstate = category === RE_CATEGORY
-        ? parseRealEstate(req.body)
-        : { operation: '', propertyType: '', area: null, bedrooms: null, bathrooms: null };
-      if (req.files && req.files.length > 0) {
-        listing.photos = req.files.map(f => f.path);
-      }
+      listing.name        = clean.name;
+      listing.description  = clean.description;
+      listing.price        = clean.price;
+      listing.category     = clean.category;
+      listing.condition    = clean.condition;
+      listing.size         = clean.size;
+      listing.realEstate   = clean.realEstate;
+
+      // Replace photos only when the client uploaded new ones.
+      const newPhotos = validatePhotoUrls(req.body.photos);
+      if (newPhotos.length > 0) listing.photos = newPhotos;
 
       await listing.save();
       res.json('Listing updated');
