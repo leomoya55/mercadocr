@@ -111,7 +111,7 @@
 
   // ─── Stats ────────────────────────────────────────────────────────────────
   function loadStats() {
-    authFetch(API_BASE_URL + '/api/admin/stats')
+    authFetch(API_BASE_URL + '/api/admin/stats', { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         setText('stat-listings-active',  d.listings && d.listings.active);
@@ -147,7 +147,7 @@
     var wrap = document.getElementById('admin-listings-table');
     if (wrap) wrap.innerHTML = '<p class="admin-loading">Cargando...</p>';
 
-    authFetch(API_BASE_URL + '/api/admin/listings?' + qs)
+    authFetch(API_BASE_URL + '/api/admin/listings?' + qs, { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         renderListingsTable(d.listings || []);
@@ -284,7 +284,7 @@
   function loadBoosts() {
     var wrap = document.getElementById('admin-boosts-table');
     if (wrap) wrap.innerHTML = '<p class="admin-loading">Cargando...</p>';
-    authFetch(API_BASE_URL + '/api/admin/boosts')
+    authFetch(API_BASE_URL + '/api/admin/boosts', { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (d) { renderBoostsTable(d.boosts || [], d.now); })
       .catch(function (err) {
