@@ -9,27 +9,20 @@ document.addEventListener('DOMContentLoaded', () => {
     featuredSection.appendChild(loading);
 
     // Home "Anuncios destacados" shows ONLY genuinely featured listings (paid
-    // boosts or admin/editorial). If there are none yet, we DON'T pass off the
-    // newest listings as "destacados" — instead we relabel the section heading to
-    // "Anuncios recientes" so nothing is ever mislabeled as featured.
-    const heading = featuredSection.querySelector('h2');
+    // boosts or admin/editorial). There is NO fallback to newest listings — if
+    // nothing is featured, the whole section is hidden so a non-featured post is
+    // never shown under the "Anuncios destacados" heading.
     const pick = (data) => {
       const list = Array.isArray(data) ? data : (data.listings || []);
       return list;
     };
     fetch(API_BASE_URL + '/api/listings?featured=true&limit=4')
       .then(r => r.json())
-      .then(data => {
-        const featuredOnly = pick(data);
-        if (featuredOnly.length) return featuredOnly;
-        // Nothing featured yet: relabel and show the newest as plain recent items.
-        if (heading) heading.textContent = 'Anuncios recientes';
-        return fetch(API_BASE_URL + '/api/listings?limit=4').then(r => r.json()).then(pick);
-      })
+      .then(pick)
       .then(list => {
         loading.remove();
         const featured = list.slice(0, 4);
-        // Hide the whole section if there are no listings at all.
+        // Nothing genuinely featured → hide the section entirely.
         if (!featured.length) { featuredSection.classList.add('hidden'); return; }
         featured.forEach(listing => {
           const listingElement = document.createElement('a');
