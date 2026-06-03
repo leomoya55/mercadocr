@@ -314,3 +314,40 @@
         grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     }
 }
+
+/* ─── "Destacá tu anuncio" promo (shown inside the publish form) ─────────────── */
+.boost-promo {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+    margin: 1.5rem 0 0.5rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid #6b5a2a;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(232,201,122,0.07), rgba(232,201,122,0.02));
+}
+.boost-promo-star { font-size: 1.6rem; line-height: 1; }
+.boost-promo-text { flex: 1; }
+.boost-promo-text strong { color: #e8c97a; }
+.boost-promo-text p { margin: 0.35rem 0 0.6rem; color: #cfcfcf; font-size: 0.92rem; }
+.boost-promo-text a { color: #e8c97a; }
+.boost-promo-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.boost-promo-list li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 84px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #6b5a2a;
+    border-radius: 8px;
+    background: #1a1a1a;
+}
+.boost-promo-list li span:first-child { color: #fff; font-size: 0.85rem; }
+.boost-promo-list li span:last-child { color: #e8c97a; font-weight: 700; }

@@ -3,6 +3,11 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
     firebaseUid:          { type: String, required: true, unique: true },
     email:                { type: String, required: true },
+    // Public handle for the seller's public profile (/perfil?u=username). Derived
+    // from the email local-part (the text before '@'), sanitized and made unique
+    // with a numeric suffix on collision. Lowercased. See generateUsername() in
+    // routes/users.js. Other users search and view sellers by this handle.
+    username:             { type: String, default: '' },
     nombre:               { type: String, default: '' },
     apellido:             { type: String, default: '' },
     phone:                { type: String, default: '' },
@@ -38,6 +43,14 @@ const userSchema = new mongoose.Schema({
 
 // Email uniqueness — the dedup_users_by_email_v1 migration already removed dupes.
 userSchema.index({ email: 1 }, { unique: true });
+
+// Public username uniqueness, only for users that actually have one (the field
+// defaults to '' until backfilled/generated). A plain unique index would collide
+// on every empty-string default, so we index only non-empty string usernames.
+userSchema.index(
+  { username: 1 },
+  { unique: true, partialFilterExpression: { username: { $type: 'string', $gt: '' } } }
+);
 
 // Phone uniqueness, but ONLY for real (non-empty) phone numbers. A plain unique
 // index would collide on the many users whose phone is '' (the schema default).

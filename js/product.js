@@ -73,6 +73,13 @@ document.addEventListener('DOMContentLoaded', function () {
         ? (escapeHtml(seller.nombre || '') + ' ' + escapeHtml(seller.apellido || '')).trim() || 'Vendedor'
         : 'Vendedor';
 
+      // Link the seller name to their public profile (marketplace-style) so buyers
+      // can browse all of that seller's listings. Only when a username exists.
+      var sellerLink = (seller && seller.username)
+        ? '<a class="product-seller-link" href="/perfil?u=' + encodeURIComponent(seller.username) + '">' +
+            sellerName + '</a>'
+        : sellerName;
+
       // WhatsApp button — uses seller.phone from User lookup
       var waLink = (typeof buildWaLink === 'function') ? buildWaLink(seller && seller.phone) : null;
       var waHtml = waLink
@@ -177,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
               : '') +
             '<div class="product-seller">' +
               '<h3>' + (isJob ? 'Publicado por' : 'Vendedor') + '</h3>' +
-              '<p>' + sellerName + sellerProBadge + '</p>' +
+              '<p>' + sellerLink + sellerProBadge + '</p>' +
             '</div>' +
             (isJob ? applyHtml : waHtml) +
             '<button type="button" class="report-btn" id="report-btn" data-listing-id="' + escapeHtml(product._id) + '">' +

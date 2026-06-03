@@ -43,7 +43,7 @@ const port = process.env.PORT || 3001;
 
 // In production, never auto-build indexes on connect — on serverless that would
 // fire on every cold start and add latency/timeout risk. Indexes are created
-// once via a guarded migration (ensure_indexes_v6) in runStartupMigrations().
+// once via a guarded migration (ensure_indexes_v7) in runStartupMigrations().
 mongoose.set('autoIndex', process.env.NODE_ENV !== 'production');
 
 // ─── Security headers ─────────────────────────────────────────────────────────
@@ -389,7 +389,7 @@ async function runStartupMigrations() {
     //     duplicate-email blocking the unique index) is logged but never blocks
     //     the others or the server. Bump the version suffix to force a rebuild
     //     after adding new indexes.
-    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v6' });
+    const indexesRan = await migrationsCol.findOne({ name: 'ensure_indexes_v7' });
     if (!indexesRan) {
       const models = {
         User:           require('./models/user.model'),
@@ -411,7 +411,7 @@ async function runStartupMigrations() {
       // Only mark complete if every model succeeded, so a transient failure
       // (e.g. a duplicate that still needs cleanup) retries on the next cold start.
       if (allOk) {
-        await migrationsCol.insertOne({ name: 'ensure_indexes_v6', ranAt: new Date() });
+        await migrationsCol.insertOne({ name: 'ensure_indexes_v7', ranAt: new Date() });
       }
     }
 
@@ -443,6 +443,45 @@ async function runStartupMigrations() {
       );
       await migrationsCol.insertOne({ name: 'backfill_listing_expiry_v1', ranAt: new Date() });
       console.log(`[migration] backfill_listing_expiry_v1: set expiresAt on ${backfilled.modifiedCount} listing(s)`);
+    }
+
+    // 7. Backfill public usernames (handles) for existing users.
+    //    New users get one lazily on their first /me; this seeds every legacy
+    //    account so they're searchable and have a public profile immediately.
+    const usernameBackfillRan = await migrationsCol.findOne({ name: 'backfill_usernames_v1' });
+    if (!usernameBackfillRan) {
+      const usersCol = mongoose.connection.collection('users');
+      const needing = await usersCol
+        .find({ $or: [{ username: { $exists: false } }, { username: '' }, { username: null }] })
+        .project({ email: 1, firebaseUid: 1 })
+        .toArray();
+      // Build usernames in-memory, tracking taken handles to guarantee uniqueness
+      // across the batch (the DB unique index is the ultimate guard).
+      const taken = new Set(
+        (await usersCol.find({ username: { $type: 'string', $gt: '' } }).project({ username: 1 }).toArray())
+          .map(u => u.username)
+      );
+      const slug = (email) => {
+        const local = String(email || '').split('@')[0].toLowerCase();
+        const s = local.normalize('NFD').replace(/[̀-ͯ]/g, '')
+          .replace(/[^a-z0-9._-]+/g, '').replace(/[._-]{2,}/g, '.').replace(/^[._-]+|[._-]+$/g, '');
+        return s || 'usuario';
+      };
+      let made = 0;
+      for (const u of needing) {
+        const base = slug(u.email);
+        let candidate = base, n = 1;
+        while (taken.has(candidate)) { n += 1; candidate = base + '-' + n; }
+        taken.add(candidate);
+        try {
+          await usersCol.updateOne({ _id: u._id }, { $set: { username: candidate } });
+          made += 1;
+        } catch (e) {
+          if (e.code !== 11000) console.warn('[migration] username backfill row failed:', e.message);
+        }
+      }
+      await migrationsCol.insertOne({ name: 'backfill_usernames_v1', ranAt: new Date() });
+      console.log(`[migration] backfill_usernames_v1: set username on ${made} user(s)`);
     }
   } catch (err) {
     // Never let a migration error prevent the server from starting

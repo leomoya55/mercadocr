@@ -7,9 +7,75 @@ const { getActiveCount }          = require('../middleware/listingLimits');
 const { getPlan, isOwner }        = require('../config/plans');
 const { getEffectiveMembership }  = require('../config/membership');
 
+// ─── Public username (handle) helpers ────────────────────────────────────────
+
+/**
+ * Derive a clean handle from an email local-part (the text before '@').
+ * Lowercased, restricted to [a-z0-9._-], with collapsed/trimmed separators.
+ * Returns 'usuario' when nothing usable remains.
+ */
+function slugFromEmail(email) {
+  const local = String(email || '').split('@')[0].toLowerCase();
+  let slug = local
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // strip accents
+    .replace(/[^a-z0-9._-]+/g, '')                     // allowed chars only
+    .replace(/[._-]{2,}/g, '.')                        // collapse runs of separators
+    .replace(/^[._-]+|[._-]+$/g, '');                  // trim leading/trailing separators
+  return slug || 'usuario';
+}
+
+/**
+ * Generate a unique username for a user, derived from their email. On collision,
+ * appends -2, -3, … until free. Excludes the user's own doc so it's idempotent.
+ * Returns the chosen username (does NOT persist it).
+ */
+async function generateUsername(email, excludeUid) {
+  const base = slugFromEmail(email);
+  let candidate = base;
+  let n = 1;
+  // Bounded loop — in practice resolves on the first 1–2 tries.
+  while (n < 1000) {
+    const clash = await User.findOne({
+      username: candidate,
+      ...(excludeUid ? { firebaseUid: { $ne: excludeUid } } : {}),
+    }).select('_id').lean();
+    if (!clash) return candidate;
+    n += 1;
+    candidate = base + '-' + n;
+  }
+  // Extremely unlikely fallback — append a short random suffix.
+  return base + '-' + Math.random().toString(36).slice(2, 7);
+}
+
+/**
+ * Ensure a user document has a username, generating + persisting one if missing.
+ * Best-effort and self-healing: safe to call on every authenticated request.
+ * Returns the (possibly newly set) username.
+ */
+async function ensureUsername(user) {
+  if (user && user.username) return user.username;
+  if (!user || !user.firebaseUid) return '';
+  const username = await generateUsername(user.email, user.firebaseUid);
+  try {
+    await User.updateOne({ firebaseUid: user.firebaseUid, $or: [{ username: '' }, { username: { $exists: false } }] }, { $set: { username } });
+    user.username = username;
+  } catch (e) {
+    // Unique-index race: another request set it first. Re-read and use that.
+    if (e && e.code === 11000) {
+      const fresh = await User.findOne({ firebaseUid: user.firebaseUid }).select('username').lean();
+      if (fresh && fresh.username) { user.username = fresh.username; return fresh.username; }
+    } else {
+      console.warn('[ensureUsername] failed:', e.message);
+    }
+  }
+  return user.username || '';
+}
+
 // ─── Shared helper: build the profile response payload ───────────────────────
 
 async function buildProfileResponse(uid, user, email) {
+  // Self-healing: make sure this user has a public handle for their profile.
+  await ensureUsername(user);
   const listingCount = await getActiveCount(uid);
   // Report the RESOLVED plan, not the stored one — an expired/lapsed paid plan
   // must surface as free so the UI and the user agree with backend enforcement.
@@ -62,10 +128,98 @@ router.get('/phone-check', async (req, res) => {
 router.get('/public/:uid', async (req, res) => {
   try {
     const user = await User.findOne({ firebaseUid: req.params.uid })
-      .select('nombre apellido phone provincia -_id').lean();
+      .select('username nombre apellido phone provincia -_id').lean();
     if (!user) return res.status(404).json('User not found');
     res.json(user);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Public seller profiles & search ─────────────────────────────────────────
+
+/**
+ * GET /search?q= — find sellers by username or name (public).
+ * Used by the "Buscar vendedores" box. Case-insensitive substring match. Returns
+ * a lightweight list (no contact info) so anyone can discover a profile.
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) return res.json({ users: [] });
+    // Escape regex metacharacters in user input.
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp(safe, 'i');
+    const users = await User.find({
+      username: { $type: 'string', $gt: '' },
+      $or: [{ username: rx }, { nombre: rx }, { apellido: rx }],
+    })
+      .select('username nombre apellido provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email firebaseUid -_id')
+      .limit(20)
+      .lean();
+
+    // Attach a live count of active listings per seller (small N, fine to loop).
+    const out = [];
+    for (const u of users) {
+      const listingCount = await getActiveCount(u.firebaseUid);
+      out.push({
+        username: u.username,
+        nombre: u.nombre || '',
+        apellido: u.apellido || '',
+        provincia: u.provincia || '',
+        sellerPro: getEffectiveMembership(u).plan === 'pro',
+        listingCount,
+      });
+    }
+    res.json({ users: out });
+  } catch (err) {
+    console.error('[GET /users/search]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /u/:username — a seller's public profile + their active listings (public).
+ * Mirrors the marketplace-style profile: anyone can view a user's published items.
+ */
+router.get('/u/:username', async (req, res) => {
+  try {
+    const username = String(req.params.username || '').trim().toLowerCase();
+    if (!username) return res.status(404).json({ error: 'not_found' });
+
+    const user = await User.findOne({ username })
+      .select('username nombre apellido provincia createdAt plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email firebaseUid')
+      .lean();
+    if (!user) return res.status(404).json({ error: 'not_found' });
+
+    // Public, active (non-hidden, non-expired) listings only.
+    const listings = await Listing.find({
+      author: user.firebaseUid,
+      status: 'active',
+      hidden: { $ne: true },
+      expiresAt: { $gt: new Date() },
+    })
+      .sort({ featured: -1, createdAt: -1 })
+      .select('-viewedBy -favoritedBy')
+      .limit(60)
+      .lean();
+
+    const sellerPro = getEffectiveMembership(user).plan === 'pro';
+
+    res.json({
+      profile: {
+        username: user.username,
+        nombre: user.nombre || '',
+        apellido: user.apellido || '',
+        provincia: user.provincia || '',
+        sellerPro,
+        memberSince: user.createdAt || null,
+        listingCount: listings.length,
+      },
+      listings: listings.map(l => ({ ...l, sellerPro })),
+    });
+  } catch (err) {
+    console.error('[GET /users/u/:username]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

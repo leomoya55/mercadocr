@@ -427,12 +427,13 @@ router.get('/:id', async (req, res) => {
     }
 
     const seller = await User.findOne({ firebaseUid: listing.author })
-      .select('nombre apellido phone provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email').lean();
+      .select('username nombre apellido phone provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email').lean();
     // Live Featured-Seller flag for the product page badge.
     const sellerPro = seller ? getEffectiveMembership(seller).plan === 'pro' : false;
     // Don't leak the seller's billing internals to the client — expose only
     // public profile fields plus the derived Pro flag.
     const publicSeller = seller ? {
+      username: seller.username || '',
       nombre: seller.nombre, apellido: seller.apellido,
       phone: seller.phone, provincia: seller.provincia,
     } : null;

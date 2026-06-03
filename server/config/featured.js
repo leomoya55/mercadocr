@@ -16,10 +16,9 @@
  */
 
 const BOOST_PACKAGES = {
-  '24h': { label: 'Destacado 24 horas', days: 1, amount: 50000  }, // ₡500
-  '7d':  { label: 'Destacado 7 días',   days: 7, amount: 150000 }, // ₡1,500
-  // Future packages drop in here, e.g.:
-  // '30d': { label: 'Destacado 30 días', days: 30, amount: 500000 },
+  '24h': { label: 'Destacado 24 horas', days: 1,  amount: 50000  }, // ₡500
+  '7d':  { label: 'Destacado 7 días',   days: 7,  amount: 150000 }, // ₡1,500
+  '30d': { label: 'Destacado 30 días',  days: 30, amount: 400000 }, // ₡4,000
 };
 
 const { isOwner } = require('./plans');

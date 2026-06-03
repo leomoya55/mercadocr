@@ -51,7 +51,7 @@ const listingSchema = new mongoose.Schema({
   featured:        { type: Boolean, default: false },
   hidden:          { type: Boolean, default: false }, // Admin moderation flag
   featuredUntil:     { type: Date,   default: null },  // null = not a timed boost
-  boostType:         { type: String, enum: ['', '24h', '7d'], default: '' },
+  boostType:         { type: String, enum: ['', '24h', '7d', '30d'], default: '' },
   boostPurchaseDate: { type: Date,   default: null },
 
   // Denormalized "is the seller a Pro member?" — powers Pro priority placement in

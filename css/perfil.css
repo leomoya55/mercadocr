@@ -1,0 +1,77 @@
+/* perfil.css — public seller profiles + seller search */
+
+.perfil-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+}
+
+.perfil-search h2 { margin: 0 0 0.3rem; }
+.perfil-search-hint { color: #aaa; margin: 0 0 1rem; font-size: 0.95rem; }
+
+.perfil-status { color: #aaa; padding: 1rem 0; text-align: center; }
+
+.hidden { display: none; }
+
+/* ─── Profile header ─────────────────────────────────────────────────────────── */
+.perfil-profile { margin-top: 1.5rem; }
+
+.perfil-header {
+    display: flex;
+    gap: 1.1rem;
+    align-items: center;
+    padding: 1.2rem 1.3rem;
+    border: 1px solid #6b5a2a;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(232,201,122,0.06), rgba(232,201,122,0.02));
+    margin-bottom: 1.5rem;
+}
+.perfil-avatar {
+    flex: none;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #e8c97a;
+    color: #1a1a1a;
+    font-size: 1.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.perfil-avatar.sm { width: 46px; height: 46px; font-size: 1.25rem; }
+.perfil-meta h2 { margin: 0; font-size: 1.4rem; }
+.perfil-meta p { margin: 0.15rem 0 0; color: #bbb; font-size: 0.9rem; }
+.perfil-username { color: #e8c97a !important; }
+
+.perfil-listings-title { margin: 0 0 1rem; color: #e8c97a; font-size: 1.1rem; }
+
+/* ─── Search results ─────────────────────────────────────────────────────────── */
+.perfil-results-title { margin: 1.5rem 0 1rem; color: #e8c97a; font-size: 1.1rem; }
+
+.perfil-seller-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+}
+.perfil-seller-card {
+    display: flex;
+    gap: 0.85rem;
+    align-items: center;
+    padding: 0.9rem 1rem;
+    border: 1px solid #333;
+    border-radius: 10px;
+    background: #1a1a1a;
+    text-decoration: none;
+    color: #fff;
+    transition: border-color 0.15s, background 0.15s;
+}
+.perfil-seller-card:hover { border-color: #e8c97a; background: #1f1c12; }
+.perfil-seller-info { display: flex; flex-direction: column; min-width: 0; }
+.perfil-seller-name { font-weight: 600; }
+.perfil-seller-handle { color: #e8c97a; font-size: 0.85rem; }
+.perfil-seller-count { color: #aaa; font-size: 0.82rem; margin-top: 0.15rem; }
+
+@media (max-width: 600px) {
+    .perfil-header { flex-direction: column; text-align: center; }
+}

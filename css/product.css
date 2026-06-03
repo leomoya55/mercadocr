@@ -214,6 +214,13 @@
   color: #ccc;
 }
 
+.product-seller-link {
+  color: #e8c97a;
+  text-decoration: none;
+  font-weight: 600;
+}
+.product-seller-link:hover { text-decoration: underline; }
+
 /* ─── WhatsApp button (product page — large) ───────────────────────────────── */
 
 .wa-btn-large {

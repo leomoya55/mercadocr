@@ -8,9 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loading.textContent = 'Cargando anuncios destacados...';
     featuredSection.appendChild(loading);
 
-    // Home "Anuncios destacados" shows ONLY paid/featured listings. If there are
-    // none yet, fall back to the 4 newest so the homepage hero is never empty
-    // (those simply won't carry the "Destacado" badge).
+    // Home "Anuncios destacados" shows ONLY genuinely featured listings (paid
+    // boosts or admin/editorial). If there are none yet, we DON'T pass off the
+    // newest listings as "destacados" — instead we relabel the section heading to
+    // "Anuncios recientes" so nothing is ever mislabeled as featured.
+    const heading = featuredSection.querySelector('h2');
     const pick = (data) => {
       const list = Array.isArray(data) ? data : (data.listings || []);
       return list;
@@ -20,12 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(data => {
         const featuredOnly = pick(data);
         if (featuredOnly.length) return featuredOnly;
-        // Fallback: newest listings when nothing is featured yet.
+        // Nothing featured yet: relabel and show the newest as plain recent items.
+        if (heading) heading.textContent = 'Anuncios recientes';
         return fetch(API_BASE_URL + '/api/listings?limit=4').then(r => r.json()).then(pick);
       })
       .then(list => {
         loading.remove();
         const featured = list.slice(0, 4);
+        // Hide the whole section if there are no listings at all.
+        if (!featured.length) { featuredSection.classList.add('hidden'); return; }
         featured.forEach(listing => {
           const listingElement = document.createElement('a');
           listingElement.href = `/product?id=${listing._id}`;

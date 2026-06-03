@@ -4,15 +4,14 @@
     <meta charset="UTF-8">
     <link rel="icon" href="/images/logo-refined.svg" type="image/svg+xml">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Panel - MercaTico</title>
+    <title>Vendedores - MercaTico</title>
+    <meta name="description" content="Encuentra vendedores en MercaTico y mira todos sus anuncios publicados.">
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/listings.css">
+    <link rel="stylesheet" href="css/perfil.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Optional error monitoring: paste your Sentry frontend DSN to enable. -->
-    <meta name="sentry-dsn" content="">
-    <script src="js/sentry-init.js?v=12"></script>
 </head>
 <body>
     <header>
@@ -39,45 +38,28 @@
         </nav>
     </header>
 
-    <main class="dashboard-page">
-        <section class="dashboard-hero">
-            <h2>Tu panel</h2>
-            <p>Administra tus anuncios, plan y pagos.</p>
-        </section>
-
-        <section class="dashboard-cards" id="dashboard-summary">
-            <div class="dashboard-card">
-                <h3>Anuncios activos</h3>
-                <div class="dashboard-metric" id="metric-count">0</div>
-            </div>
-            <div class="dashboard-card">
-                <h3>Publicaciones disponibles</h3>
-                <div class="dashboard-metric" id="metric-free">—</div>
-            </div>
-            <div class="dashboard-card">
-                <h3>Plan actual</h3>
-                <div class="dashboard-metric" id="metric-plan">Gratis</div>
-            </div>
-            <div class="dashboard-card" id="metric-credits-card" style="display:none">
-                <h3>Créditos individuales</h3>
-                <div class="dashboard-metric" id="metric-credits">0</div>
+    <main class="perfil-page">
+        <!-- Seller search -->
+        <section class="perfil-search">
+            <h2>Buscar vendedores</h2>
+            <p class="perfil-search-hint">Buscá un vendedor por su nombre de usuario o nombre y mirá todos sus anuncios.</p>
+            <div class="search-bar">
+                <input type="search" id="seller-q" placeholder="Ej: juanperez" autocomplete="off" aria-label="Buscar vendedor">
+                <button id="seller-search-btn" type="button">Buscar</button>
             </div>
         </section>
 
-        <section class="dashboard-upgrade" id="dashboard-upgrade">
-            <div class="upgrade-card">
-                <div>
-                    <h3>Pásate a Pro</h3>
-                    <p>₡10,000/mes. Anuncios ilimitados sin límite de publicaciones.</p>
-                </div>
-                <button class="cta-button" id="upgrade-pro">Hacerme Pro</button>
-            </div>
+        <!-- Search results -->
+        <section class="perfil-results hidden" id="perfil-results" aria-live="polite"></section>
+
+        <!-- Single profile -->
+        <section class="perfil-profile hidden" id="perfil-profile" aria-live="polite">
+            <div class="perfil-header" id="perfil-header"></div>
+            <h3 class="perfil-listings-title" id="perfil-listings-title"></h3>
+            <div class="listings-grid" id="perfil-listings"></div>
         </section>
 
-        <section class="dashboard-listings">
-            <h3>Tus anuncios</h3>
-            <div class="listings-grid" id="dashboard-listings"></div>
-        </section>
+        <div class="perfil-status" id="perfil-status"></div>
     </main>
 
     <footer>
@@ -92,9 +74,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/config.js?v=13"></script>
-    <script src="js/user-store.js?v=12"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=16"></script>
-    <script src="js/dashboard.js?v=19"></script>
+    <script src="js/perfil.js?v=1"></script>
 </body>
 </html>

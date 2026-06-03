@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const BOOST_OPTIONS = [
     { type: '24h', title: 'Destacado 24 horas', price: '₡500' },
     { type: '7d',  title: 'Destacado 7 días',   price: '₡1.500' },
+    { type: '30d', title: 'Destacado 30 días',  price: '₡4.000' },
   ];
 
   function openBoostChooser(listingId) {
