@@ -225,6 +225,23 @@ router.get('/users', async (req, res) => {
       User.countDocuments(filter),
     ]);
 
+    // Resolve each user's referrer (referredBy = firebaseUid) into a readable
+    // name/username so the admin table can show "Referido por" without N lookups
+    // on the client. One batched query for the whole page.
+    const refUids = [...new Set(users.map(u => u.referredBy).filter(Boolean))];
+    if (refUids.length) {
+      const referrers = await User.find({ firebaseUid: { $in: refUids } })
+        .select('firebaseUid username nombre apellido -_id').lean();
+      const byUid = Object.create(null);
+      referrers.forEach(r => { byUid[r.firebaseUid] = r; });
+      users.forEach(u => {
+        const r = u.referredBy && byUid[u.referredBy];
+        u.referredByInfo = r
+          ? { username: r.username || '', name: ((r.nombre || '') + ' ' + (r.apellido || '')).trim() }
+          : null;
+      });
+    }
+
     res.json({ users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (err) {
     console.error('[GET /admin/users]', err);

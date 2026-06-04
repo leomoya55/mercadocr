@@ -382,12 +382,23 @@
     if (!users.length) { wrap.innerHTML = '<p class="admin-loading">Sin usuarios.</p>'; return; }
 
     var html = '<table class="admin-table"><thead><tr>' +
-      '<th>Nombre</th><th>Email</th><th>Plan</th><th>Créditos</th><th>Provincia</th><th>Registrado</th><th>Acciones</th>' +
+      '<th>Nombre</th><th>Email</th><th>Plan</th><th>Créditos</th><th>Referidos</th><th>Referido por</th><th>Provincia</th><th>Registrado</th><th>Acciones</th>' +
       '</tr></thead><tbody>';
 
     users.forEach(function (u) {
       var name = ((u.nombre || '') + ' ' + (u.apellido || '')).trim() || '—';
       var uid  = escapeHtml(u.firebaseUid || '');
+
+      // "Referido por": resolved by the server into { username, name }.
+      var refBy = '—';
+      if (u.referredByInfo) {
+        var refName = (u.referredByInfo.name || u.referredByInfo.username || '').trim();
+        refBy = u.referredByInfo.username
+          ? '<a href="/perfil?u=' + escapeHtml(u.referredByInfo.username) + '" target="_blank" rel="noopener noreferrer" class="admin-link">' +
+              escapeHtml(refName || u.referredByInfo.username) + '</a>'
+          : escapeHtml(refName || '—');
+      }
+
       html +=
         '<tr>' +
         '<td>' + escapeHtml(name) + '</td>' +
@@ -407,6 +418,8 @@
           ' <button class="btn-sm" data-action="add-credit" data-uid="' + uid + '" title="Agregar 1 crédito">+</button>' +
           ' <button class="btn-sm" data-action="remove-credit" data-uid="' + uid + '" title="Quitar 1 crédito">−</button>' +
         '</td>' +
+        '<td style="text-align:center;font-weight:700;">' + (u.referralCount || 0) + '</td>' +
+        '<td style="font-size:0.8rem;">' + refBy + '</td>' +
         '<td>' + escapeHtml(u.provincia || '—') + '</td>' +
         '<td style="font-size:0.8rem;">' + (u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-CR') : '—') + '</td>' +
         '<td class="admin-actions">' +

@@ -5,7 +5,7 @@
     <link rel="icon" href="/images/logo-refined.svg" type="image/svg+xml">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Panel - MercaTico</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/styles.css?v=2">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,6 +74,16 @@
             </div>
         </section>
 
+        <section class="dashboard-referral" id="dashboard-referral" style="display:none">
+            <h3>Invita y comparte</h3>
+            <p>Comparte tu enlace. Cada persona que se registre con él cuenta como tu referido.</p>
+            <div class="referral-row">
+                <input type="text" id="referral-link" readonly aria-label="Tu enlace de invitación">
+                <button type="button" class="cta-button" id="referral-copy">Copiar</button>
+            </div>
+            <p class="referral-count">Has referido a <strong id="referral-count">0</strong> persona(s).</p>
+        </section>
+
         <section class="dashboard-listings">
             <h3>Tus anuncios</h3>
             <div class="listings-grid" id="dashboard-listings"></div>
@@ -92,9 +102,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/config.js?v=13"></script>
-    <script src="js/user-store.js?v=12"></script>
+    <script src="js/user-store.js?v=13"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=16"></script>
-    <script src="js/dashboard.js?v=19"></script>
+    <script src="js/dashboard.js?v=20"></script>
 </body>
 </html>

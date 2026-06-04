@@ -56,9 +56,24 @@
     let reg;
     try { reg = JSON.parse(raw); } catch { return data; }
 
-    // Only send if at least one key registration field is still blank.
-    // Checks nombre, phone, AND provincia so a user who had no provincia
-    // also gets the forward.
+    // Referral forward (independent of profile completeness). If the immediate
+    // /ensure call in register.js failed (e.g. server cold-start), the referral
+    // was never attributed. Re-send the ref to /ensure now — it's idempotent and
+    // sets referredBy at most once, within the signup window. Best-effort.
+    if (reg.ref && !data.user.referredBy) {
+      try {
+        await authFetch('/api/users/ensure', {
+          method: 'POST',
+          body: JSON.stringify({ ref: reg.ref }),
+        });
+      } catch (e) {
+        console.warn('[UserStore] referral forward failed:', e.message);
+      }
+    }
+
+    // Only send the profile back-fill if at least one key registration field is
+    // still blank. Checks nombre, phone, AND provincia so a user who had no
+    // provincia also gets the forward.
     if (data.user.nombre && data.user.phone && data.user.provincia) return data;
 
     try {

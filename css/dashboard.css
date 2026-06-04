@@ -135,3 +135,49 @@
 .boost-option:hover { border-color: #e8c97a; background: #1f1c12; }
 .boost-option-title { font-weight: 600; }
 .boost-option-price { color: #e8c97a; font-weight: 700; }
+
+/* ─── Referral / invite section ──────────────────────────────────────────────
+   Shown on the dashboard so each member can copy their invite link and see how
+   many people they've referred. */
+.dashboard-referral {
+    margin: 2rem 0;
+    padding: 1.4rem 1.6rem;
+    border: 1px solid #2a2a2a;
+    border-left: 4px solid #e8c97a;
+    border-radius: 12px;
+    background: #161616;
+}
+.dashboard-referral h3 {
+    margin: 0 0 0.4rem;
+    color: #e8c97a;
+}
+.dashboard-referral > p {
+    margin: 0 0 1rem;
+    color: #bbb;
+    font-size: 0.92rem;
+}
+.referral-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.referral-row input {
+    flex: 1 1 260px;
+    min-width: 0;
+    background: #0f0f0f;
+    border: 1px solid #333;
+    color: #f0f0f0;
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+}
+.referral-row .cta-button {
+    flex: 0 0 auto;
+}
+.referral-count {
+    margin: 1rem 0 0;
+    color: #ddd;
+    font-size: 0.95rem;
+}
+.referral-count strong { color: #e8c97a; }

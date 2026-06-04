@@ -24,6 +24,16 @@ const userSchema = new mongoose.Schema({
     singlePostCredits:    { type: Number, default: 0, min: 0 },
     listingsCount:        { type: Number, default: 0 },
 
+    // ─── Referrals ──────────────────────────────────────────────────────────
+    // referredBy: firebaseUid of the member whose invite link this user signed up
+    // with. Set EXACTLY ONCE, at (or just after) signup — see POST /ensure. Once
+    // non-empty it is locked, so a referral can never be re-attributed or
+    // double-counted. '' = organic signup / no referrer.
+    referredBy:           { type: String, default: '' },
+    // Lifetime number of users who signed up with this member's invite link.
+    // Denormalized counter, incremented atomically when a referral is attributed.
+    referralCount:        { type: Number, default: 0, min: 0 },
+
     // ─── Stripe / subscription state ────────────────────────────────────────
     // These are a CACHE of Stripe's state, written ONLY by the webhook and the
     // cron backstop. Never read `plan` directly for entitlement decisions — use
@@ -75,5 +85,9 @@ userSchema.index(
 
 // Cron backstop scans for paid users whose period has lapsed.
 userSchema.index({ plan: 1, currentPeriodEnd: 1 });
+
+// Referral lookups: list everyone a given member referred (admin) — sparse-ish
+// since most rows have referredBy = ''.
+userSchema.index({ referredBy: 1 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -116,6 +116,13 @@ async function buildProfileResponse(uid, user, email) {
     },
     listingCount, remaining, maxListings, credits,
     overLimit, excess,
+    // Referral summary for the member's own dashboard. `code` is their public
+    // username, which doubles as their invite code; the client builds the full
+    // link as `${origin}/register?ref=${code}`. `count` is lifetime referrals.
+    referral: {
+      code:  user.username || '',
+      count: user.referralCount || 0,
+    },
   };
 }
 
@@ -451,6 +458,48 @@ router.post('/ensure', verifyToken, async (req, res) => {
         { $set: toSet },
         { new: true }
       );
+    }
+
+    // ─── Referral attribution (once, at/near signup) ────────────────────────
+    // `ref` is the referrer's public username, carried from the invite link
+    // (/register?ref=<username>). We attribute the referral here because /ensure
+    // is the one call register.js makes with the ref in hand. Rules:
+    //   - set referredBy AT MOST ONCE (the conditional update below is atomic, so
+    //     concurrent /ensure calls can't double-count);
+    //   - never self-refer; the referrer must be a different account;
+    //   - only within 7 days of account creation, so an old account can't have a
+    //     referrer attached long after the fact.
+    try {
+      const ref = String(req.body.ref || '').trim().toLowerCase();
+      if (ref && user && !user.referredBy) {
+        const ACCOUNT_AGE_LIMIT = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const age = Date.now() - new Date(user.createdAt || Date.now()).getTime();
+        if (age <= ACCOUNT_AGE_LIMIT) {
+          const referrer = await User.findOne({ username: ref })
+            .select('firebaseUid email').lean();
+          const selfRefer = referrer &&
+            (referrer.firebaseUid === uid ||
+             (referrer.email || '').toLowerCase() === (email || '').toLowerCase());
+          if (referrer && !selfRefer) {
+            // Atomic: only the FIRST writer (referredBy still empty) wins, so the
+            // referrer's counter is incremented exactly once.
+            const claim = await User.updateOne(
+              { firebaseUid: uid, $or: [{ referredBy: '' }, { referredBy: { $exists: false } }] },
+              { $set: { referredBy: referrer.firebaseUid } }
+            );
+            if (claim.modifiedCount === 1) {
+              await User.updateOne(
+                { firebaseUid: referrer.firebaseUid },
+                { $inc: { referralCount: 1 } }
+              );
+              user.referredBy = referrer.firebaseUid;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Referral tracking is best-effort — never fail registration over it.
+      console.warn('[ensure] referral attribution failed:', e.message);
     }
 
     res.json({ user });

@@ -287,6 +287,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (upgradeSection) upgradeSection.classList.add('hidden');
   }
 
+  // ─── Referral / invite link ────────────────────────────────────────────────
+  // Builds the member's invite link from their public username (referral.code)
+  // and shows their lifetime referral count. Hidden until a code exists.
+  let _referralWired = false;
+  const renderReferral = (referral) => {
+    const section = document.getElementById('dashboard-referral');
+    if (!section) return;
+
+    const code = referral && referral.code;
+    if (!code) { section.style.display = 'none'; return; }
+
+    const link    = `${window.location.origin}/register?ref=${encodeURIComponent(code)}`;
+    const linkInp = document.getElementById('referral-link');
+    const countEl = document.getElementById('referral-count');
+    const copyBtn = document.getElementById('referral-copy');
+
+    if (linkInp) linkInp.value = link;
+    if (countEl) countEl.textContent = (referral && referral.count) || 0;
+    section.style.display = '';
+
+    if (copyBtn && !_referralWired) {
+      _referralWired = true;
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(link);
+          Toast.success('Enlace copiado.');
+        } catch {
+          // Clipboard API unavailable (e.g. insecure context) — select for manual copy.
+          if (linkInp) { linkInp.focus(); linkInp.select(); }
+          Toast.info('Copia el enlace seleccionado.');
+        }
+      });
+    }
+  };
+
   // ─── Main loader ──────────────────────────────────────────────────────────
   const loadDashboard = async (user) => {
     if (metricFree)        metricFree.textContent  = '...';
@@ -348,6 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
       creditsCard.style.display = '';
       if (metricCredits) metricCredits.textContent = credits;
     }
+
+    // ── Referral / invite section ──────────────────────────────────────────
+    renderReferral(profileData.referral);
 
     // Show upgrade banner unless Pro or no slots warning needed
     if (upgradeSection) {

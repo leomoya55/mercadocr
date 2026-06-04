@@ -2,6 +2,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('register-form');
     const submitButton = registerForm.querySelector('button[type="submit"]');
 
+    // ── Referral capture ──────────────────────────────────────────────────────
+    // An invite link looks like /register?ref=<username>. We forward this code to
+    // the server at /ensure so it can attribute the referral to that member.
+    const referralCode = (new URLSearchParams(window.location.search).get('ref') || '')
+        .trim().toLowerCase();
+
     // Inline error display
     const errorEl = document.createElement('p');
     errorEl.style.cssText = 'color:#e08080;font-size:0.88rem;margin:0.5rem 0 0;';
@@ -84,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Content-Type':  'application/json',
                         'Authorization': 'Bearer ' + token,
                     },
-                    body: JSON.stringify({ nombre, apellido, phone, provincia, email }),
+                    body: JSON.stringify({ nombre, apellido, phone, provincia, email, ref: referralCode }),
                 });
             } catch (persistErr) {
                 // Network failure during registration — keep mcr_reg as a backup.
@@ -94,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // mcr_reg backup: forwarded by UserStore.getProfile() if the /ensure
             // call above failed (e.g. server was cold-starting).
-            sessionStorage.setItem('mcr_reg', JSON.stringify({ phone, provincia, nombre, apellido }));
+            sessionStorage.setItem('mcr_reg', JSON.stringify({ phone, provincia, nombre, apellido, ref: referralCode }));
 
             sessionStorage.setItem('verificationEmail', email);
             window.location.href = '/verify-email';
