@@ -4,6 +4,9 @@
   padding: 2rem;
   max-width: 1100px;
   margin: 0 auto;
+  /* Never let the detail content push past the viewport (would force a
+     pinch-zoom on mobile and break the sticky header). */
+  overflow-x: hidden;
 }
 
 .product-grid {
@@ -12,10 +15,35 @@
   gap: 2rem;
 }
 
+/* min-width:0 lets each column actually shrink to its track instead of being
+   forced wider by long unbreakable content (long titles, pasted URLs, etc.). */
+.product-images-col,
+.product-info {
+  min-width: 0;
+}
+
 @media (min-width: 768px) {
   .product-grid {
     grid-template-columns: 55% 1fr;
     align-items: start;
+  }
+}
+
+/* Tighter padding + smaller heading so everything fits a phone screen at 100%
+   zoom — no horizontal scroll, no need to pinch out. */
+@media (max-width: 600px) {
+  .product-page {
+    padding: 1.1rem 1rem;
+  }
+  .product-info h1 {
+    font-size: 1.5rem;
+  }
+  .product-price {
+    font-size: 1.4rem;
+  }
+  .wa-btn-large {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -134,6 +162,10 @@
   color: #e8c97a;
   margin-top: 0;
   line-height: 1.25;
+  /* Break long unspaced strings (e.g. a pasted URL in the title) instead of
+     letting them blow out the page width on mobile. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .product-info h1 .badge-featured {
@@ -173,6 +205,8 @@
   margin: 0;
   color: #ddd;
   line-height: 1.65;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Preserve the paragraphs/line breaks the seller typed in the description. */
@@ -207,11 +241,19 @@
 }
 
 .product-realestate li span { color: #aaa; }
-.product-realestate li strong { color: #fff; }
+.product-realestate li strong {
+  color: #fff;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .product-seller p {
   margin: 0.2rem 0;
   color: #ccc;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .product-seller-link {
