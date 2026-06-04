@@ -194,11 +194,50 @@ document.addEventListener('DOMContentLoaded', () => {
     badge.className = 'thumb-badge';
     const spinner = document.createElement('span');
     spinner.className = 'thumb-spinner';
+    // Remove ("×") button — lets the user drop a wrongly-chosen photo without
+    // having to re-pick the whole selection.
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'thumb-remove';
+    removeBtn.setAttribute('aria-label', 'Quitar imagen');
+    removeBtn.title = 'Quitar imagen';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeItem(item);
+    });
     thumb.appendChild(img);
     thumb.appendChild(spinner);
     thumb.appendChild(badge);
+    thumb.appendChild(removeBtn);
     item.el = thumb;
     previewContainer.appendChild(thumb);
+  }
+
+  // Remove a single staged photo: drop it from the list + DOM and keep the file
+  // input in sync so validation and any later re-selection are consistent. The
+  // already-uploaded Cloudinary image (if any) is simply left unreferenced; it's
+  // never attached to the listing (covered by the orphan-sweep noted in the launch review).
+  function removeItem(item) {
+    const idx = uploadItems.indexOf(item);
+    if (idx !== -1) uploadItems.splice(idx, 1);
+    if (item.el && item.el.parentNode) item.el.parentNode.removeChild(item.el);
+    syncInputFiles();
+  }
+
+  // Rebuild imagesInput.files from the still-selected items so the native input
+  // reflects exactly what will be published.
+  function syncInputFiles() {
+    if (!imagesInput) return;
+    try {
+      const dt = new DataTransfer();
+      uploadItems.forEach((it) => { if (it.file) dt.items.add(it.file); });
+      imagesInput.files = dt.files;
+    } catch (e) {
+      // DataTransfer unsupported (very old browser) — non-fatal; submit still
+      // relies on uploadItems for the actual URLs.
+    }
   }
 
   async function uploadOne(item) {

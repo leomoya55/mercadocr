@@ -427,7 +427,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const seller = await User.findOne({ firebaseUid: listing.author })
-      .select('username nombre apellido phone provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email').lean();
+      .select('username nombre apellido phone provincia photoURL plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email').lean();
     // Live Featured-Seller flag for the product page badge.
     const sellerPro = seller ? getEffectiveMembership(seller).plan === 'pro' : false;
     // Don't leak the seller's billing internals to the client — expose only
@@ -436,6 +436,7 @@ router.get('/:id', async (req, res) => {
       username: seller.username || '',
       nombre: seller.nombre, apellido: seller.apellido,
       phone: seller.phone, provincia: seller.provincia,
+      photoURL: seller.photoURL || '',
     } : null;
     res.json({ ...listing, seller: publicSeller, sellerPro });
   } catch (err) {

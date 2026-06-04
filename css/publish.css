@@ -291,6 +291,29 @@
 .preview-thumb.is-done  .thumb-badge { display: block; background: #2ecc71; }
 .preview-thumb.is-error .thumb-badge { display: block; background: #e8c97a; color: #0d0d0d; }
 
+/* Remove ("×") button — top-left so it never overlaps the status badge. */
+.preview-thumb .thumb-remove {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s;
+    z-index: 2;
+}
+.preview-thumb .thumb-remove:hover { background: #e74c3c; }
+
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
     .publish-page {

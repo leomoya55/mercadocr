@@ -9,3 +9,13 @@
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+
+// Keep the user signed in across page navigations and reloads. LOCAL is the SDK
+// default, but we set it EXPLICITLY so the session is never silently downgraded
+// to in-memory (which would log the user out on every full-page navigation —
+// a behavior seen on iOS Safari). Best-effort: if the browser blocks persistent
+// storage we keep whatever the SDK falls back to instead of throwing.
+try {
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(function (e) { console.warn('[auth] persistence:', e && e.message); });
+} catch (e) { /* older SDK — ignore */ }

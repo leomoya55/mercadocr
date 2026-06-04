@@ -3,9 +3,18 @@ const User     = require('../models/user.model');
 const Listing  = require('../models/listing.model');
 const { verifyToken }            = require('../middleware/auth');
 const { ensureUser }             = require('../middleware/ensureUser');
+const ensureVerified             = require('../middleware/ensureVerified');
 const { getActiveCount }          = require('../middleware/listingLimits');
 const { getPlan, isOwner }        = require('../config/plans');
 const { getEffectiveMembership }  = require('../config/membership');
+const { cloudinary, configureCloudinary } = require('../config/cloudinary');
+
+// Accept only well-formed Cloudinary URLs from OUR cloud + avatars folder.
+function isValidAvatarUrl(url) {
+  if (typeof url !== 'string') return false;
+  const prefix = 'https://res.cloudinary.com/' + (process.env.CLOUDINARY_CLOUD_NAME || '') + '/';
+  return url.startsWith(prefix) && url.includes('/mercadocr/avatars/');
+}
 
 // ─── Public username (handle) helpers ────────────────────────────────────────
 
@@ -128,7 +137,7 @@ router.get('/phone-check', async (req, res) => {
 router.get('/public/:uid', async (req, res) => {
   try {
     const user = await User.findOne({ firebaseUid: req.params.uid })
-      .select('username nombre apellido phone provincia -_id').lean();
+      .select('username nombre apellido phone provincia photoURL -_id').lean();
     if (!user) return res.status(404).json('User not found');
     res.json(user);
   } catch (err) {
@@ -154,7 +163,7 @@ router.get('/search', async (req, res) => {
       username: { $type: 'string', $gt: '' },
       $or: [{ username: rx }, { nombre: rx }, { apellido: rx }],
     })
-      .select('username nombre apellido provincia plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email firebaseUid -_id')
+      .select('username nombre apellido provincia photoURL plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email firebaseUid -_id')
       .limit(20)
       .lean();
 
@@ -167,6 +176,7 @@ router.get('/search', async (req, res) => {
         nombre: u.nombre || '',
         apellido: u.apellido || '',
         provincia: u.provincia || '',
+        photoURL: u.photoURL || '',
         sellerPro: getEffectiveMembership(u).plan === 'pro',
         listingCount,
       });
@@ -188,7 +198,7 @@ router.get('/u/:username', async (req, res) => {
     if (!username) return res.status(404).json({ error: 'not_found' });
 
     const user = await User.findOne({ username })
-      .select('username nombre apellido provincia createdAt plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email firebaseUid')
+      .select('username nombre apellido provincia photoURL createdAt plan compedPlan subscriptionStatus currentPeriodEnd planExpiresAt cancelAtPeriodEnd email firebaseUid')
       .lean();
     if (!user) return res.status(404).json({ error: 'not_found' });
 
@@ -212,6 +222,7 @@ router.get('/u/:username', async (req, res) => {
         nombre: user.nombre || '',
         apellido: user.apellido || '',
         provincia: user.provincia || '',
+        photoURL: user.photoURL || '',
         sellerPro,
         memberSince: user.createdAt || null,
         listingCount: listings.length,
@@ -236,6 +247,54 @@ router.get('/me', verifyToken, ensureUser, async (req, res) => {
     res.json(await buildProfileResponse(req.uid, req.dbUser, req.email));
   } catch (err) {
     console.error('[GET /me]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /me/avatar-signature
+ * Hands the browser a short-lived Cloudinary signature for a direct profile-photo
+ * upload (folder mercadocr/avatars). Gated to authenticated, verified users.
+ */
+router.post('/me/avatar-signature', verifyToken, ensureVerified, (req, res) => {
+  try {
+    configureCloudinary();
+    const timestamp = Math.round(Date.now() / 1000);
+    const folder = 'mercadocr/avatars';
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp, folder },
+      process.env.CLOUDINARY_API_SECRET
+    );
+    res.json({
+      signature, timestamp, folder,
+      apiKey: process.env.CLOUDINARY_API_KEY,
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    });
+  } catch (err) {
+    console.error('[POST /me/avatar-signature]', err.message);
+    res.status(500).json({ error: 'No se pudo preparar la subida de la foto.' });
+  }
+});
+
+/**
+ * PUT /me/photo   body: { photoURL }
+ * Save (or clear) the user's profile picture. photoURL must be a Cloudinary URL
+ * from our cloud + avatars folder; pass '' to remove the current photo.
+ */
+router.put('/me/photo', verifyToken, ensureUser, async (req, res) => {
+  try {
+    const raw = (req.body && typeof req.body.photoURL === 'string') ? req.body.photoURL.trim() : '';
+    if (raw && !isValidAvatarUrl(raw)) {
+      return res.status(400).json({ error: 'URL de imagen inválida.' });
+    }
+    const updated = await User.findOneAndUpdate(
+      { firebaseUid: req.uid },
+      { $set: { photoURL: raw } },
+      { new: true }
+    ).select('photoURL').lean();
+    res.json({ photoURL: updated ? updated.photoURL : '' });
+  } catch (err) {
+    console.error('[PUT /me/photo]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

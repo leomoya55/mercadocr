@@ -221,6 +221,27 @@
 }
 .product-seller-link:hover { text-decoration: underline; }
 
+.product-seller-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.product-seller-row p { margin: 0; }
+.product-seller-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e8c97a;
+  color: #1a1a1a;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.product-seller-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
 /* ─── WhatsApp button (product page — large) ───────────────────────────────── */
 
 .wa-btn-large {

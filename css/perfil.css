@@ -40,6 +40,8 @@
     justify-content: center;
 }
 .perfil-avatar.sm { width: 46px; height: 46px; font-size: 1.25rem; }
+.perfil-avatar.has-photo { background: none; overflow: hidden; }
+.perfil-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
 .perfil-meta h2 { margin: 0; font-size: 1.4rem; }
 .perfil-meta p { margin: 0.15rem 0 0; color: #bbb; font-size: 0.9rem; }
 .perfil-username { color: #e8c97a !important; }

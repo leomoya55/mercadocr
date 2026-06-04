@@ -94,6 +94,16 @@ document.addEventListener('DOMContentLoaded', function () {
     return n ? n.charAt(0).toUpperCase() : '?';
   }
 
+  // Avatar markup: photo when available, else an initial-letter circle.
+  function avatarHtml(p, sizeClass, px) {
+    var cls = 'perfil-avatar' + (sizeClass ? ' ' + sizeClass : '');
+    if (p.photoURL) {
+      return '<div class="' + cls + ' has-photo" aria-hidden="true">' +
+        '<img src="' + escapeHtml(cldAvatar(p.photoURL, px || 200)) + '" alt="" loading="lazy"></div>';
+    }
+    return '<div class="' + cls + '" aria-hidden="true">' + escapeHtml(avatarLetter(p)) + '</div>';
+  }
+
   // ─── Render: single profile ─────────────────────────────────────────────────
   function renderProfile(data) {
     var p = data.profile;
@@ -107,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function () {
       : '';
 
     headerEl.innerHTML =
-      '<div class="perfil-avatar" aria-hidden="true">' + escapeHtml(avatarLetter(p)) + '</div>' +
+      avatarHtml(p, '', 200) +
       '<div class="perfil-meta">' +
         '<h2>' + escapeHtml(displayName(p)) + proBadge + '</h2>' +
         '<p class="perfil-username">@' + escapeHtml(p.username) + '</p>' +
@@ -150,8 +160,7 @@ document.addEventListener('DOMContentLoaded', function () {
         : '';
       var name = ((u.nombre || '') + ' ' + (u.apellido || '')).trim() || ('@' + u.username);
       a.innerHTML =
-        '<div class="perfil-avatar sm" aria-hidden="true">' +
-          escapeHtml((u.nombre || u.username || '?').charAt(0).toUpperCase()) + '</div>' +
+        avatarHtml(u, 'sm', 96) +
         '<div class="perfil-seller-info">' +
           '<span class="perfil-seller-name">' + escapeHtml(name) + proBadge + '</span>' +
           '<span class="perfil-seller-handle">@' + escapeHtml(u.username) + '</span>' +

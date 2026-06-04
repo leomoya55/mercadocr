@@ -10,6 +10,9 @@ const userSchema = new mongoose.Schema({
     username:             { type: String, default: '' },
     nombre:               { type: String, default: '' },
     apellido:             { type: String, default: '' },
+    // Optional profile picture (Cloudinary secure_url in the mercadocr/avatars
+    // folder). '' = no photo → the UI falls back to an initial-letter avatar.
+    photoURL:             { type: String, default: '' },
     phone:                { type: String, default: '' },
     provincia:            { type: String, default: '' },
     plan:                 { type: String, enum: ['free', 'basic', 'pro'], default: 'free' },

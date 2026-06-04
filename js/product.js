@@ -80,6 +80,20 @@ document.addEventListener('DOMContentLoaded', function () {
             sellerName + '</a>'
         : sellerName;
 
+      // Seller avatar: photo when available, else an initial-letter circle.
+      var sellerInitial = (seller && (seller.nombre || seller.username || '?')).trim
+        ? ((seller && (seller.nombre || seller.username)) || '?').trim().charAt(0).toUpperCase()
+        : '?';
+      var avatarInner = (seller && seller.photoURL)
+        ? '<img src="' + escapeHtml(cldAvatar(seller.photoURL, 96)) + '" alt="" loading="lazy">'
+        : escapeHtml(sellerInitial);
+      var avatarClass = 'product-seller-avatar' + (seller && seller.photoURL ? ' has-photo' : '');
+      var sellerAvatar = '<div class="' + avatarClass + '" aria-hidden="true">' + avatarInner + '</div>';
+      // Wrap the avatar in a profile link when we have a username.
+      if (seller && seller.username) {
+        sellerAvatar = '<a href="/perfil?u=' + encodeURIComponent(seller.username) + '" aria-label="Ver perfil del vendedor">' + sellerAvatar + '</a>';
+      }
+
       // WhatsApp button — uses seller.phone from User lookup
       var waLink = (typeof buildWaLink === 'function') ? buildWaLink(seller && seller.phone) : null;
       var waHtml = waLink
@@ -184,7 +198,10 @@ document.addEventListener('DOMContentLoaded', function () {
               : '') +
             '<div class="product-seller">' +
               '<h3>' + (isJob ? 'Publicado por' : 'Vendedor') + '</h3>' +
-              '<p>' + sellerLink + sellerProBadge + '</p>' +
+              '<div class="product-seller-row">' +
+                sellerAvatar +
+                '<p>' + sellerLink + sellerProBadge + '</p>' +
+              '</div>' +
             '</div>' +
             (isJob ? applyHtml : waHtml) +
             '<button type="button" class="report-btn" id="report-btn" data-listing-id="' + escapeHtml(product._id) + '">' +

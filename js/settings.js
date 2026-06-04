@@ -10,6 +10,107 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { el.className = 'settings-status'; el.textContent = ''; }, 4000);
     }
 
+    // ─── Profile picture ──────────────────────────────────────────────────────
+    const avatarInput     = document.getElementById('avatar-input');
+    const avatarUploadBtn = document.getElementById('avatar-upload-btn');
+    const avatarRemoveBtn = document.getElementById('avatar-remove-btn');
+    const avatarImg       = document.getElementById('avatar-img');
+    const avatarLetter    = document.getElementById('avatar-letter');
+    const avatarStatus    = document.getElementById('avatar-status');
+
+    // Reflect the current photo (or initial-letter fallback) in the preview.
+    function renderAvatar(photoURL, nameSource) {
+        if (photoURL) {
+            avatarImg.src = cldAvatar(photoURL, 200);
+            avatarImg.hidden = false;
+            if (avatarLetter) avatarLetter.hidden = true;
+            if (avatarRemoveBtn) avatarRemoveBtn.hidden = false;
+        } else {
+            avatarImg.hidden = true;
+            if (avatarLetter) {
+                avatarLetter.hidden = false;
+                const n = (nameSource || '').trim();
+                avatarLetter.textContent = n ? n.charAt(0).toUpperCase() : '?';
+            }
+            if (avatarRemoveBtn) avatarRemoveBtn.hidden = true;
+        }
+    }
+
+    async function uploadAvatar(file) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            showStatus(avatarStatus, 'Selecciona una imagen válida.', 'error');
+            return;
+        }
+        avatarUploadBtn.disabled = true;
+        const original = avatarUploadBtn.textContent;
+        avatarUploadBtn.textContent = 'Subiendo...';
+        try {
+            // 1. Signature for a direct-to-Cloudinary upload (avatars folder).
+            const sigRes = await authFetch('/api/users/me/avatar-signature', { method: 'POST' });
+            if (!sigRes.ok) throw new Error('No se pudo preparar la subida.');
+            const sig = await sigRes.json();
+
+            // 2. Upload straight to Cloudinary.
+            const data = new FormData();
+            data.append('file', file);
+            data.append('api_key', sig.apiKey);
+            data.append('timestamp', sig.timestamp);
+            data.append('signature', sig.signature);
+            if (sig.folder) data.append('folder', sig.folder);
+            const cldRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
+                method: 'POST', body: data,
+            });
+            const payload = await cldRes.json().catch(() => ({}));
+            if (!cldRes.ok || !payload.secure_url) {
+                throw new Error((payload.error && payload.error.message) || 'No se pudo subir la imagen.');
+            }
+
+            // 3. Persist the URL on the profile.
+            const saveRes = await authFetch('/api/users/me/photo', {
+                method: 'PUT',
+                body: JSON.stringify({ photoURL: payload.secure_url }),
+            });
+            if (!saveRes.ok) throw new Error('No se pudo guardar la foto.');
+            const saved = await saveRes.json();
+
+            UserStore.invalidate();
+            renderAvatar(saved.photoURL, profileForm['nombre'].value);
+            showStatus(avatarStatus, 'Foto actualizada.', 'success');
+        } catch (err) {
+            console.error('[settings] avatar upload failed:', err);
+            showStatus(avatarStatus, err.message || 'Error al subir la foto.', 'error');
+        } finally {
+            avatarUploadBtn.disabled = false;
+            avatarUploadBtn.textContent = original;
+        }
+    }
+
+    async function removeAvatar() {
+        avatarRemoveBtn.disabled = true;
+        try {
+            const res = await authFetch('/api/users/me/photo', {
+                method: 'PUT',
+                body: JSON.stringify({ photoURL: '' }),
+            });
+            if (!res.ok) throw new Error('No se pudo quitar la foto.');
+            UserStore.invalidate();
+            renderAvatar('', profileForm['nombre'].value);
+            showStatus(avatarStatus, 'Foto eliminada.', 'success');
+        } catch (err) {
+            showStatus(avatarStatus, err.message || 'Error al quitar la foto.', 'error');
+        } finally {
+            avatarRemoveBtn.disabled = false;
+        }
+    }
+
+    if (avatarUploadBtn) avatarUploadBtn.addEventListener('click', () => avatarInput && avatarInput.click());
+    if (avatarInput) avatarInput.addEventListener('change', () => {
+        const file = avatarInput.files && avatarInput.files[0];
+        if (file) uploadAvatar(file);
+        avatarInput.value = ''; // allow re-selecting the same file
+    });
+    if (avatarRemoveBtn) avatarRemoveBtn.addEventListener('click', removeAvatar);
+
     function lockNameFields() {
         const nombreInput   = profileForm['nombre'];
         const apellidoInput = profileForm['apellido'];
@@ -72,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
             profileForm['apellido'].value  = apellido;
             profileForm['phone'].value     = profile.phone     || '';
             profileForm['provincia'].value = profile.provincia || '';
+
+            renderAvatar(profile.photoURL || '', nombre || user.email);
 
             if (nombre && apellido) lockNameFields();
             // Lock the phone field only if one is already saved (settable once).

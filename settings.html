@@ -41,6 +41,24 @@
             <h2>Configuración</h2>
             <p>Administra tu perfil y preferencias de cuenta.</p>
 
+            <!-- Profile picture -->
+            <div class="settings-section">
+                <h3>Foto de perfil</h3>
+                <p class="settings-hint">Tu foto aparece en tu perfil público y junto a tus anuncios.</p>
+                <div class="avatar-editor">
+                    <div class="avatar-preview" id="avatar-preview">
+                        <img id="avatar-img" alt="Foto de perfil" hidden>
+                        <span id="avatar-letter" class="avatar-letter" aria-hidden="true">?</span>
+                    </div>
+                    <div class="avatar-actions">
+                        <input type="file" id="avatar-input" accept="image/*" hidden>
+                        <button type="button" class="cta-button" id="avatar-upload-btn">Cambiar foto</button>
+                        <button type="button" class="cta-button secondary" id="avatar-remove-btn" hidden>Quitar foto</button>
+                        <div class="settings-status" id="avatar-status"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Profile section -->
             <div class="settings-section">
                 <h3>Información de perfil</h3>
@@ -107,10 +125,10 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
     <script src="js/firebase-config.js"></script>
-    <script src="js/config.js?v=12"></script>
+    <script src="js/config.js?v=14"></script>
     <script src="js/user-store.js?v=12"></script>
     <script src="js/ui.js?v=13"></script>
     <script src="js/auth-redirect.js?v=16"></script>
-    <script src="js/settings.js?v=12"></script>
+    <script src="js/settings.js?v=13"></script>
 </body>
 </html>
