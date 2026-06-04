@@ -66,6 +66,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = user.displayName || user.email.split('@')[0];
             const btn = document.getElementById('nav-user-btn');
             if (btn) btn.textContent = name;
+
+            // Point "Mi perfil público" at the user's own public seller page so
+            // they can open it, copy the URL, and share it. The username is
+            // resolved from the public profile endpoint and cached in
+            // sessionStorage to avoid refetching on every page. Until resolved,
+            // the link falls back to the generic /perfil directory.
+            const profileLink = document.querySelector('[data-profile-link]');
+            if (profileLink) {
+                const cacheKey = 'mcr_username_' + user.uid;
+                const cached = sessionStorage.getItem(cacheKey);
+                if (cached) {
+                    profileLink.href = '/perfil?u=' + encodeURIComponent(cached);
+                } else if (typeof API_BASE_URL !== 'undefined') {
+                    fetch(API_BASE_URL + '/api/users/public/' + encodeURIComponent(user.uid))
+                        .then(r => (r.ok ? r.json() : null))
+                        .then(d => {
+                            if (d && d.username) {
+                                try { sessionStorage.setItem(cacheKey, d.username); } catch (e) {}
+                                profileLink.href = '/perfil?u=' + encodeURIComponent(d.username);
+                            }
+                        })
+                        .catch(() => {});
+                }
+            }
         }
     });
 });
