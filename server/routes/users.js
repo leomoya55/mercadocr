@@ -509,6 +509,55 @@ router.post('/ensure', verifyToken, async (req, res) => {
   }
 });
 
+// ─── Self-service account deletion for the "wrong email" case ─────────────────
+//
+// DELETE /me
+// Lets a user who just registered with a TYPO in their email throw the account
+// away themselves and start over — instead of the owner having to manually
+// delete it from both Firebase Auth and MongoDB. Deletes the Mongo profile AND
+// the Firebase Auth user (server-side via Admin SDK, so it works even if the
+// client session isn't "recently logged in").
+//
+// SCOPE GUARD: only UNVERIFIED accounts may self-delete here. A verified account
+// may have listings/history, so deleting it is routed through support to avoid
+// accidental data loss and orphaned listings.
+router.delete('/me', verifyToken, async (req, res) => {
+  try {
+    if (req.emailVerified) {
+      return res.status(403).json({
+        error: 'verified_account',
+        message: 'Tu cuenta ya está verificada. Escríbenos a soporte para eliminarla.',
+      });
+    }
+
+    // Extra safety: never delete an account that already has listings.
+    const listingCount = await Listing.countDocuments({ author: req.uid });
+    if (listingCount > 0) {
+      return res.status(409).json({
+        error: 'has_listings',
+        message: 'Tu cuenta tiene anuncios. Escríbenos a soporte para eliminarla.',
+      });
+    }
+
+    await User.deleteOne({ firebaseUid: req.uid });
+
+    // Delete the Firebase Auth user too, so the email is freed up immediately and
+    // the user can re-register with the corrected address. Best-effort: if it
+    // fails, the Mongo doc is already gone and the client also calls user.delete().
+    try {
+      const admin = require('firebase-admin');
+      await admin.auth().deleteUser(req.uid);
+    } catch (e) {
+      console.warn('[DELETE /me] Firebase deleteUser failed (client will retry):', e.message);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[DELETE /me]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Legacy routes (backwards compatibility) ──────────────────────────────────
 
 // GET /:uid — same payload as /me, verifies caller owns the profile

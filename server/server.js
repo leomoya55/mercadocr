@@ -230,6 +230,75 @@ app.get('/product', async (req, res, next) => {
   }
 });
 
+// ─── Dynamic OG meta for seller profiles (/perfil?u=username) ────────────────
+//
+// Without this, sharing a seller link shows the generic "Vendedores - MercaTico"
+// preview. Here we look up the seller and inject their name + avatar so the
+// preview reads e.g. "Vendedor - Leonardo Moya | MercaTico". Must run BEFORE
+// express.static so this overrides the static perfil.html. Falls through to the
+// static page when there's no ?u= or the user isn't found.
+app.get('/perfil', async (req, res, next) => {
+  const username = String(req.query.u || '').trim().toLowerCase();
+  if (!username) return next(); // generic /perfil directory → static page
+
+  try {
+    await connectDB();
+    const User = require('./models/user.model');
+    const user = await User.findOne({ username })
+      .select('nombre apellido username photoURL -_id').lean();
+    if (!user) return next();
+
+    const htmlPath = path.join(__dirname, '../perfil.html');
+    let html = fs.readFileSync(htmlPath, 'utf8');
+
+    const esc = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    const fullName = ((user.nombre || '') + ' ' + (user.apellido || '')).trim() || user.username;
+    const name     = esc(fullName);
+    const title    = `Vendedor - ${name} | MercaTico`;
+    const ogTitle  = `Vendedor - ${name}`;
+    const desc     = esc(`Mira todos los anuncios de ${fullName} en MercaTico.`);
+
+    // Avatar for the preview image; optimize Cloudinary URLs and fall back to the
+    // site image when the seller has no photo. og:image needs an absolute URL.
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
+    const base  = proto + '://' + req.headers.host;
+    let rawPhoto = String(user.photoURL || '');
+    if (rawPhoto.includes('res.cloudinary.com') && rawPhoto.includes('/upload/') && !/\/upload\/[^/]*f_auto/.test(rawPhoto)) {
+      rawPhoto = rawPhoto.replace('/upload/', '/upload/f_auto,q_auto/');
+    }
+    const photo = /^https?:\/\//i.test(rawPhoto) ? esc(rawPhoto) : esc(base + '/images/estasies.png');
+    const url   = esc(base + '/perfil?u=' + encodeURIComponent(user.username));
+
+    html = html
+      .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+      .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${desc}">`)
+      .replace(
+        '</head>',
+        `  <meta property="og:title" content="${ogTitle}">\n` +
+        `  <meta property="og:description" content="${desc}">\n` +
+        `  <meta property="og:type" content="profile">\n` +
+        `  <meta property="og:url" content="${url}">\n` +
+        `  <meta property="og:image" content="${photo}">\n` +
+        `  <meta property="og:site_name" content="MercaTico">\n` +
+        `  <meta name="twitter:card" content="summary_large_image">\n` +
+        `  <meta name="twitter:title" content="${ogTitle}">\n` +
+        `  <meta name="twitter:description" content="${desc}">\n` +
+        `  <meta name="twitter:image" content="${photo}">\n` +
+        '</head>'
+      );
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.send(html);
+  } catch (err) {
+    console.error('[OG perfil]', err.message);
+    next(); // fall through to static on any error
+  }
+});
+
 // ─── Social link-preview (Open Graph) for the home + listings pages ──────────
 //
 // Injects og:/twitter: meta so links shared on WhatsApp/Facebook show a title,

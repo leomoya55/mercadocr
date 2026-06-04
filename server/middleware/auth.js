@@ -25,6 +25,7 @@ const verifyToken = async (req, res, next) => {
       req.uid   = decoded.uid;
       req.user = { uid: decoded.uid, email: (decoded.email || '').toLowerCase().trim() };
       req.email = (decoded.email || '').toLowerCase().trim();
+      req.emailVerified = !!decoded.email_verified;
     } else {
       // ── INSECURE dev-only fallback ──────────────────────────────────────────
       // Decodes the JWT payload WITHOUT verifying the signature. This trusts any
@@ -44,6 +45,7 @@ const verifyToken = async (req, res, next) => {
       req.uid = uid;
       req.user = { uid, email: (payload.email || '').toLowerCase().trim() };
       req.email = (payload.email || '').toLowerCase().trim();
+      req.emailVerified = !!payload.email_verified;
     }
     next();
   } catch (error) {

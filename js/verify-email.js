@@ -49,6 +49,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ── "Usar otro correo" — fix a wrong email by discarding this account ───────
+    // If the user typed the wrong email, they're stuck on this screen forever
+    // (the verification link goes to an inbox they don't own). This lets them
+    // throw the just-created, still-unverified account away themselves — deleting
+    // both the MongoDB profile and the Firebase Auth user — and start over, with
+    // no manual cleanup needed by the owner.
+    const switchEmailLink = document.querySelector('.verify-link');
+    if (switchEmailLink) {
+        switchEmailLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const ok = window.confirm(
+                'Esto eliminará esta cuenta sin verificar para que puedas registrarte de nuevo con el correo correcto. ¿Continuar?'
+            );
+            if (!ok) return;
+
+            statusLabel.textContent = 'Eliminando la cuenta sin verificar...';
+            try {
+                if (userRef) {
+                    // 1) Server-side delete (Mongo profile + Firebase user) while the
+                    //    token is still valid.
+                    try {
+                        const token = await userRef.getIdToken();
+                        await fetch(API_BASE_URL + '/api/users/me', {
+                            method: 'DELETE',
+                            headers: { Authorization: 'Bearer ' + token },
+                        });
+                    } catch (err) {
+                        console.warn('Server-side account delete failed:', err);
+                    }
+                    // 2) Client-side delete as a backstop (no-op if already removed).
+                    try { await userRef.delete(); } catch (err) { /* already gone / needs recent login */ }
+                    try { await auth.signOut(); } catch (err) { /* ignore */ }
+                }
+            } finally {
+                sessionStorage.removeItem('verificationEmail');
+                sessionStorage.removeItem('mcr_reg');
+                window.location.href = '/register';
+            }
+        });
+    }
+
     checkButton.addEventListener('click', async () => {
         if (!userRef) {
             statusLabel.textContent = 'Iniciá sesión para verificar tu correo.';
