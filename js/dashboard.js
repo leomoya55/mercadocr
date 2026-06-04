@@ -299,8 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!code) { section.style.display = 'none'; return; }
 
     // Short, shareable form: /ref/<code> (the server redirects it to the register
-    // page with ?ref=). Reads cleaner than the query-string version.
-    const link    = `${window.location.origin}/ref/${encodeURIComponent(code)}`;
+    // page with ?ref=). Built from the canonical SITE_ORIGIN so the link always
+    // shows the real domain, even if the dashboard was opened via a vercel.app URL.
+    const base    = (typeof SITE_ORIGIN === 'string' && SITE_ORIGIN) ? SITE_ORIGIN : window.location.origin;
+    const link    = `${base}/ref/${encodeURIComponent(code)}`;
     const linkInp = document.getElementById('referral-link');
     const countEl = document.getElementById('referral-count');
     const copyBtn = document.getElementById('referral-copy');

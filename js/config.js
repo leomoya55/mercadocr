@@ -5,6 +5,15 @@ const API_BASE_URL = (
   window.location.hostname !== '127.0.0.1'
 ) ? '' : (window.location.port === '5000' ? '' : 'http://localhost:5000');
 
+// Canonical public origin for SHARE links (referral invites, etc.) so they
+// always read as the real domain — never a vercel.app deployment URL — no matter
+// which host the page was opened from. On localhost we fall back to the current
+// origin so dev links still work.
+const SITE_ORIGIN = (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) ? window.location.origin : 'https://www.mercaticocr.com';
+
 function escapeHtml(str) {
   if (str == null) return '';
   const div = document.createElement('div');
