@@ -38,8 +38,23 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             resendButton.disabled = true;
             resendButton.textContent = 'Enviando...';
-            await userRef.sendEmailVerification();
-            statusLabel.textContent = 'Correo reenviado. Revisá tu bandeja de entrada.';
+
+            // Prefer our own-domain sender (Resend) via the server; fall back to
+            // Firebase's built-in email if the server can't send.
+            let sent = false;
+            try {
+                const token = await userRef.getIdToken();
+                const res = await fetch(API_BASE_URL + '/api/users/me/send-verification', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                sent = res.ok;
+            } catch (e) { /* fall back below */ }
+            if (!sent) {
+                await userRef.sendEmailVerification();
+            }
+
+            statusLabel.textContent = 'Correo reenviado. Revisá tu bandeja de entrada (y spam).';
         } catch (error) {
             console.error('Verification email error:', error);
             statusLabel.textContent = 'No se pudo reenviar el correo. Intentá más tarde.';

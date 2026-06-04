@@ -5,7 +5,7 @@
     <link rel="icon" href="/images/logo-refined.svg" type="image/svg+xml">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Panel - MercaTico</title>
-    <link rel="stylesheet" href="css/styles.css?v=2">
+    <link rel="stylesheet" href="css/styles.css?v=3">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,6 +41,11 @@
     </header>
 
     <main class="dashboard-page">
+        <div class="verify-banner hidden" id="verify-banner">
+            <span class="verify-banner-text">📧 Verificá tu correo para poder publicar. Revisá tu bandeja de entrada <strong>y la carpeta de spam</strong>.</span>
+            <button type="button" class="cta-button secondary" id="verify-banner-resend">Reenviar correo</button>
+        </div>
+
         <section class="dashboard-hero">
             <h2>Tu panel</h2>
             <p>Administra tus anuncios, plan y pagos.</p>
@@ -105,7 +110,7 @@
     <script src="js/config.js?v=15"></script>
     <script src="js/user-store.js?v=13"></script>
     <script src="js/ui.js?v=13"></script>
-    <script src="js/auth-redirect.js?v=17"></script>
-    <script src="js/dashboard.js?v=22"></script>
+    <script src="js/auth-redirect.js?v=18"></script>
+    <script src="js/dashboard.js?v=23"></script>
 </body>
 </html>

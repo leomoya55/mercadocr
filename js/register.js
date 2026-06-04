@@ -1,3 +1,26 @@
+/**
+ * Send the email-verification message. Tries our own-domain sender (Resend, via
+ * the server) first for good deliverability, then falls back to Firebase's
+ * built-in sender so verification never silently fails.
+ */
+async function sendVerificationEmail(user) {
+    try {
+        const token = await user.getIdToken();
+        const res = await fetch(API_BASE_URL + '/api/users/me/send-verification', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (res.ok) return; // sent via Resend
+    } catch (e) {
+        // network error → fall through to Firebase fallback
+    }
+    try {
+        await user.sendEmailVerification();
+    } catch (e) {
+        console.warn('Verification email fallback failed:', e.message);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('register-form');
     const submitButton = registerForm.querySelector('button[type="submit"]');
@@ -72,9 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (navBtn) navBtn.textContent = `${nombre} ${apellido}`;
             }
 
-            // Send verification email — fire and forget, doesn't block redirect
-            user.sendEmailVerification().catch(e => console.warn('Verification email:', e.message));
-
             // ── Step 3: Persist registration data immediately to the server ─────
             //
             // We call /api/users/ensure right now, while we still have the form data
@@ -97,6 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // UserStore.getProfile() will forward it on the first authenticated page load.
                 console.warn('[register] immediate profile persist failed:', persistErr.message);
             }
+
+            // ── Step 4: Send the verification email ─────────────────────────────
+            // Prefer our own domain sender (Resend) for deliverability; fall back
+            // to Firebase's built-in email if the server can't send.
+            submitButton.textContent = 'Enviando correo...';
+            await sendVerificationEmail(user);
 
             // mcr_reg backup: forwarded by UserStore.getProfile() if the /ensure
             // call above failed (e.g. server was cold-starting).

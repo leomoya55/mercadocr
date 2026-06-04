@@ -446,3 +446,24 @@ footer {
     white-space: nowrap;
 }
 .over-limit-banner a:hover { text-decoration: underline; }
+
+/* ─── Email-verification banner (shown on the dashboard to unverified users) ── */
+.verify-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 0 0 1.25rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid #6b5a2a;
+    border-left: 4px solid #e8c97a;
+    border-radius: 8px;
+    background: #221d10;
+    color: #e7dcc2;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+.verify-banner.hidden { display: none; }
+.verify-banner-text { flex: 1 1 260px; }
+.verify-banner .cta-button { flex: 0 0 auto; padding: 0.55rem 1.1rem; font-size: 0.9rem; }

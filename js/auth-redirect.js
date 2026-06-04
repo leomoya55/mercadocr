@@ -32,11 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
     auth.onAuthStateChanged(async user => {
         const isVerified = user && user.emailVerified;
 
-        // Redirect unverified users away from protected pages (panel, publishing,
-        // settings, admin). Public pages (home, listings, product) stay open.
+        // Redirect unverified users away from actions that REQUIRE a verified
+        // email (publishing, admin). The dashboard and settings stay OPEN to
+        // unverified users so a delivery hiccup never hard-locks them out — the
+        // dashboard shows a "verify to publish" banner with a resend button
+        // instead. The server still enforces verification on publish/upload.
         // The site uses CLEAN urls (/dashboard, not /dashboard.html), so normalize.
         const path = (window.location.pathname || '/').replace(/\.html$/, '');
-        const PROTECTED = ['/dashboard', '/publish', '/settings', '/admin'];
+        const PROTECTED = ['/publish', '/admin'];
         const onProtected = PROTECTED.some(p => path === p || path.indexOf(p + '/') === 0);
         if (user && onProtected && !user.emailVerified) {
             // The cached token can lag after a user verifies — refresh once before

@@ -422,9 +422,51 @@ document.addEventListener('DOMContentLoaded', () => {
     window.history.replaceState({}, document.title, '/dashboard');
   }
 
+  // ─── Email-verification banner ──────────────────────────────────────────────
+  // Unverified users can now reach their dashboard (instead of being bounced),
+  // so we show a clear banner explaining they must verify to publish, with a
+  // resend button. Prefers our own-domain sender (Resend) and falls back to
+  // Firebase's built-in email.
+  function showVerifyBanner(user) {
+    const banner = document.getElementById('verify-banner');
+    if (!banner) return;
+    const needs = user && !user.emailVerified && user.email !== OWNER_EMAIL;
+    banner.classList.toggle('hidden', !needs);
+    if (!needs) return;
+
+    const resendBtn = document.getElementById('verify-banner-resend');
+    if (resendBtn && !resendBtn._wired) {
+      resendBtn._wired = true;
+      resendBtn.addEventListener('click', async () => {
+        resendBtn.disabled = true;
+        resendBtn.textContent = 'Enviando...';
+        try {
+          let sent = false;
+          try {
+            const token = await user.getIdToken();
+            const res = await fetch(API_BASE_URL + '/api/users/me/send-verification', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + token },
+            });
+            sent = res.ok;
+          } catch (e) { /* fall back below */ }
+          if (!sent) { await user.sendEmailVerification(); }
+          Toast.success('Correo de verificación enviado. Revisá tu bandeja (y spam).');
+        } catch (e) {
+          Toast.error('No se pudo enviar el correo. Intentá de nuevo en un momento.');
+        } finally {
+          resendBtn.disabled = false;
+          resendBtn.textContent = 'Reenviar correo';
+        }
+      });
+    }
+  }
+
   auth.onAuthStateChanged((user) => {
     if (!user) { window.location.href = '/login'; return; }
     if (user.email === OWNER_EMAIL) applyOwnerUI();
+
+    showVerifyBanner(user);
 
     loadDashboard(user).catch(err => {
       console.error(err);

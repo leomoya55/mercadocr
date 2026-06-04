@@ -8,6 +8,8 @@ const { getActiveCount }          = require('../middleware/listingLimits');
 const { getPlan, isOwner }        = require('../config/plans');
 const { getEffectiveMembership }  = require('../config/membership');
 const { cloudinary, configureCloudinary } = require('../config/cloudinary');
+const { isConfigured: emailConfigured, sendVerificationEmail } = require('../config/email');
+const { writeLimiter }            = require('../middleware/rateLimiters');
 
 // Accept only well-formed Cloudinary URLs from OUR cloud + avatars folder.
 function isValidAvatarUrl(url) {
@@ -506,6 +508,38 @@ router.post('/ensure', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('[ensure]', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Verification email (sent from our own domain via Resend) ─────────────────
+//
+// POST /me/send-verification
+// Mints a Firebase verification link server-side and emails it from
+// verificacion@mercaticocr.com (good deliverability) instead of Firebase's
+// generic sender. The client falls back to firebase user.sendEmailVerification()
+// when this returns a non-2xx (e.g. Resend not configured yet), so verification
+// keeps working during the transition.
+router.post('/me/send-verification', verifyToken, writeLimiter, async (req, res) => {
+  try {
+    if (req.emailVerified) return res.json({ alreadyVerified: true });
+    if (!req.email)        return res.status(400).json({ error: 'no_email' });
+
+    // No provider configured → tell the client to use the Firebase fallback.
+    if (!emailConfigured()) {
+      return res.status(503).json({ error: 'email_not_configured', code: 'EMAIL_NOT_CONFIGURED' });
+    }
+
+    const admin    = require('firebase-admin');
+    const SITE_URL = process.env.SITE_URL || 'https://www.mercaticocr.com';
+    // The continue URL must be on a Firebase Authorized Domain (mercaticocr.com).
+    const link = await admin.auth().generateEmailVerificationLink(req.email, { url: SITE_URL + '/login' });
+
+    await sendVerificationEmail(req.email, link);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[POST /me/send-verification]', err.message);
+    // 502 signals "we tried but the provider failed" → client falls back.
+    res.status(502).json({ error: 'send_failed', code: 'SEND_FAILED' });
   }
 });
 
