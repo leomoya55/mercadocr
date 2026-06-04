@@ -298,7 +298,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = referral && referral.code;
     if (!code) { section.style.display = 'none'; return; }
 
-    const link    = `${window.location.origin}/register?ref=${encodeURIComponent(code)}`;
+    // Short, shareable form: /ref/<code> (the server redirects it to the register
+    // page with ?ref=). Reads cleaner than the query-string version.
+    const link    = `${window.location.origin}/ref/${encodeURIComponent(code)}`;
     const linkInp = document.getElementById('referral-link');
     const countEl = document.getElementById('referral-count');
     const copyBtn = document.getElementById('referral-copy');

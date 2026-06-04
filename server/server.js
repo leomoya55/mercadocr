@@ -144,6 +144,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── Pretty referral links ───────────────────────────────────────────────────
+// /ref/<username> → /register?ref=<username>. Lets members share a short, clean
+// invite link (e.g. www.mercaticocr.com/ref/juan.perez) instead of a query
+// string. The code must match our username charset; anything else falls through
+// to a normal 404 (prevents this from becoming an open-redirect).
+app.get('/ref/:code', (req, res, next) => {
+  const code = String(req.params.code || '').toLowerCase();
+  if (!/^[a-z0-9._-]{1,40}$/.test(code)) return next();
+  return res.redirect(302, '/register?ref=' + encodeURIComponent(code));
+});
+
 // ─── OG / SEO meta-tag injection for product pages ───────────────────────────
 //
 // Must come BEFORE express.static so dynamic meta overrides the static file.
